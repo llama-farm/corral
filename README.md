@@ -1,164 +1,162 @@
 # 🦙 Corral
 
-**Auth + payments your AI agent can set up.**
+### You don't add auth to your app. Your agent does.
 
-Point your coding agent (OpenClaw, Claude Code, Codex, Cursor) at Corral.
-Tell it what you need. It adds login, Stripe billing, and feature gating to
-your app in one conversation.
-
-[![CI](https://github.com/llama-farm/corral/actions/workflows/ci.yml/badge.svg)](https://github.com/llama-farm/corral/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@llamafarm/corral?label=%40llamafarm%2Fcorral)](https://www.npmjs.com/package/@llamafarm/corral)
-[![npm](https://img.shields.io/npm/v/corral?label=corral%20CLI)](https://www.npmjs.com/package/corral)
+[![npm](https://img.shields.io/npm/v/create-corral?label=create-corral&color=f59e0b)](https://www.npmjs.com/package/create-corral)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## For Agents
+## ⚡ Get Started in 10 Seconds
 
-```bash
-# Your agent runs:
-npx create-corral init
-npx create-corral add plan pro --price 29
-npx create-corral add provider google
-npx create-corral validate
-# Done. Your app has auth + payments.
-```
-
-**Agent context:** Tell your agent to read [`llms.txt`](llms.txt)
-or [`llms-full.txt`](llms-full.txt) for the full spec.
-
-Works with: **OpenClaw** (native skill) · **Claude Code** · **Codex** · **Cursor** · **Windsurf** · **Aider** · any agent that can run CLI commands
-
-→ [Full agent integration guide](agents.html)
-
-## For Humans
+Copy this into your AI coding agent (Claude Code, Cursor, Codex, OpenClaw, Windsurf — anything):
 
 ```
-You: "Add auth and Stripe billing. Free tier and Pro at $29/mo with Google login."
-Agent: Done. Login at localhost:3000/login.
+Read: https://llama-farm.github.io/corral/llms.txt
+
+Add auth and Stripe billing to my app. Free tier + Pro
+at $29/mo with 14-day trial. Wire up everything: login,
+signup, profile page, admin dashboard, upgrade banners,
+and feature gating.
 ```
 
-Tell your AI coding assistant what you want. Corral handles the plumbing.
+That's it. Your agent reads the spec, runs the CLI, wires the UI. You ship.
 
 ---
 
-## What Corral Does
+## 🤔 What Just Happened?
 
-Corral bundles auth + billing + feature gating into a single cohesive toolkit,
-configured by one YAML file. Built on [better-auth](https://better-auth.com),
-[Hono](https://hono.dev/), and [Stripe](https://stripe.com).
+Your agent ran `npx create-corral init`, which:
 
-- 🔐 **Authentication** — email/password, OAuth (Google, GitHub, etc.), magic links, sessions
-- 💳 **Billing** — Stripe subscriptions, usage-based pricing, payment portal, webhooks
-- 🔒 **Feature gating** — plan-aware `FeatureGate` components and `requireFeature()` middleware
-- 📊 **Usage tracking** — increment counters, enforce limits, expose usage APIs
-- 🗄️ **Multi-database** — SQLite (dev), PostgreSQL, MySQL (production)
-- 🤖 **Agent-native** — `--json` on every CLI command, `CORRAL.md` generated at init, `/api/llms.txt`
-- 🧩 **Framework-agnostic** — Next.js, Express, Hono, Fastify; Python, Go, Rust validators
+1. **Detected your framework** — Express, Next.js, Hono, Fastify, Koa, Vite+React, FastAPI, and [13+ more](https://llama-farm.github.io/corral/frameworks.html)
+2. **Embedded auth into your existing server** — no new services, no Docker, same database
+3. **Generated everything:**
 
-## Quick Start (Humans)
+| What | File |
+|------|------|
+| Auth setup (Better Auth + your DB) | `src/lib/corral.ts` |
+| Login, signup, sessions, OAuth | `/api/auth/*` routes |
+| Profile page (edit name, password, delete account) | `src/components/ProfilePage.tsx` |
+| Admin dashboard (users, roles, plan overrides) | `src/components/AdminPanel.tsx` |
+| Account menu (dropdown for navbar) | `src/components/AccountMenu.tsx` |
+| Plan gating (`<PlanGate>`, `<FeatureGate>`, blur/block) | `src/gates.tsx` |
+| Auth hook + provider | `src/auth-context.tsx` |
+| Stripe checkout, billing portal, webhooks | `/api/corral/*` routes |
+| Agent integration guide | `CORRAL.md` |
+| Config (plans, features, meters, auth) | `corral.yaml` |
 
-```bash
-# 1. Scaffold auth + billing into your existing app
-npx create-corral init
+4. **Showed your agent the full feature list** — so it proactively wires up profile pages, upgrade banners, and admin dashboards without you asking
 
-# 2. Add your Stripe & auth secrets
-cp .env.local.example .env.local
+---
 
-# 3. Start the dev server
-npm run dev
-```
+## 🎁 Everything You Get
 
-That's it. You have auth, billing, and feature gating running locally.
+### Ready to use (works immediately)
+- ✅ Email/password sign-up & sign-in
+- ✅ Social login (Google, GitHub, Apple, Discord + 6 more)
+- ✅ Magic link & email OTP (passwordless)
+- ✅ Session management, password reset, email verification
 
-## Quick Start (Agents)
+### Generated components (your agent wires them up)
+- 🔌 **Account Menu** — navbar dropdown: profile, settings, upgrade, admin, sign out
+- 🔌 **Profile Page** — edit name, change password, manage email, delete account
+- 🔌 **Admin Dashboard** — user list, role management, plan overrides, usage stats
+- 🔌 **Sign-in / Sign-up Pages** — social buttons, magic link, OTP tabs
+- 🔌 **Upgrade Banner** — shows free users what they're missing
 
-Agents: read [`llms.txt`](llms.txt) for the full spec.
-The 9-command workflow:
+### Billing & monetization (Stripe-powered)
+- 🔌 **Pricing Table** — auto-generated from `corral.yaml`, monthly/annual toggle
+- 🔌 **One-click upgrade** → Stripe Checkout → back to your app
+- 🔌 **Billing Portal** — manage subscription, invoices, payment method
+- 🔌 **Plan Gating** — `<PlanGate plan="pro">` with blur/skeleton/block modes
+- 🔌 **Usage Metering** — track API calls, storage, etc. with per-plan limits
+- 🔌 **Free Trials** — configurable per plan (default 14 days)
+
+### Developer & admin tools
+- 🔌 **Feature Flags** — `<FeatureGate feature="ai-chat">` per-plan toggling
+- 🔌 **CLI Auth** — device authorization flow (like `gh auth login`)
+- 🔌 **API Keys** — programmatic access for integrations
+- 🔌 **Deploy** — `corral deploy docker|fly|railway|render`
+
+---
+
+## 🔧 The 9-Command Workflow
+
+Your agent runs these. You don't have to.
 
 ```bash
 corral analyze --json          # 1. understand the project
 corral init --yes --json       # 2. scaffold everything
 corral add provider google     # 3. add OAuth
 corral add plan pro --price 29 # 4. add paid plan
-corral add feature X --plans pro --gate blur --json  # 5. gate a feature
-corral add meter api_calls --limit 10000 --json      # 6. add usage meter
-corral stripe push --json      # 7. sync to Stripe
-corral validate --json         # 8. verify everything (exit 0 = deploy-ready)
+corral add feature ai --plans pro --gate blur  # 5. gate a feature
+corral add meter api_calls --limit 10000       # 6. add usage meter
+corral stripe sync --json      # 7. sync to Stripe
+corral validate --json         # 8. verify everything
 corral seed --env test --json  # 9. seed test users
 ```
 
-All commands output `--json` with structured `{ "status": "ok", "result": {...}, "next_steps": [...] }`.
-Errors always include a `"fix"` field.
-
-## Packages
-
-| Package | Description | npm |
-|---------|-------------|-----|
-| [`@llamafarm/corral`](packages/server) | Server core — auth, billing, gating, DB adapters | [![npm](https://img.shields.io/npm/v/@llamafarm/corral)](https://www.npmjs.com/package/@llamafarm/corral) |
-| [`@llamafarm/corral-ui`](packages/ui) | React components — auth flows, billing UI, usage meters | [![npm](https://img.shields.io/npm/v/@llamafarm/corral-ui)](https://www.npmjs.com/package/@llamafarm/corral-ui) |
-| [`corral`](packages/cli) | CLI — scaffold projects, add features, manage config | [![npm](https://img.shields.io/npm/v/corral)](https://www.npmjs.com/package/corral) |
-
-## Monorepo Structure
-
-```
-corral/
-├── packages/
-│   ├── server/     # @llamafarm/corral
-│   ├── ui/         # @llamafarm/corral-ui
-│   └── cli/        # corral (CLI)
-├── docs/           # GitHub Pages site
-├── templates/      # Project scaffold templates
-└── turbo.json      # Turborepo config
-```
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Build all packages
-npm run build
-
-# TypeScript check
-npm run typecheck
-
-# Watch mode
-npm run dev
-```
-
-## Releasing
-
-This project uses [Changesets](https://github.com/changesets/changesets) for versioning.
-
-```bash
-# 1. Create a changeset describing your changes
-npm run changeset
-
-# 2. Version packages (updates package.json + CHANGELOG)
-npm run version
-
-# 3. Publish to npm (CI does this automatically on git tags)
-npm run release
-```
-
-## Docs
-
-📖 **[docs.llamafarm.dev/corral](https://docs.llamafarm.dev/corral)**
-
-- [Agent Integration Guide](agents.html) — for AI coding agents
-- [llms.txt](llms.txt) — agent-readable spec
-- [Quickstart](quickstart.html.html) — for humans
-
-## Contributing
-
-Contributions welcome! Please open an issue before submitting large PRs.
-
-## License
-
-[MIT](LICENSE) © [llama-farm](https://github.com/llama-farm)
+Every command supports `--json`. Errors include a `"fix"` field. Exit 0 = deploy-ready.
 
 ---
 
-*Built by LlamaFarm 🦙 · Made for agents, works for humans too*
+## 📋 More Prompts to Try
+
+**Just auth, no billing:**
+```
+Read: https://llama-farm.github.io/corral/llms.txt
+Add authentication to my app with email + Google login.
+```
+
+**Add to existing project:**
+```
+Read: https://llama-farm.github.io/corral/llms.txt
+Add Corral auth + billing to this project. Detect my
+framework and embed into my existing server.
+```
+
+**Deploy:**
+```
+Read: https://llama-farm.github.io/corral/llms.txt
+Generate Docker + Railway deployment configs for this app.
+```
+
+---
+
+## 🏗️ How It Works
+
+Corral is **not a hosted service**. It's a CLI that generates code into your project.
+
+- **One YAML config** (`corral.yaml`) — plans, features, meters, auth providers
+- **Embedded, not hosted** — mounts as route handlers in your app, same DB, same process
+- **Built on** [Better Auth](https://better-auth.com) + [Stripe](https://stripe.com)
+- **Agent-native** — `llms.txt` spec, `CORRAL.md` guide, `--json` everywhere, `.corral/agent-checklist.json`
+
+### Supported frameworks
+Express · Hono · Fastify · Koa · Hapi · NestJS · Polka · Restify · AdonisJS · Elysia · H3/Nitro · Next.js · Vite+React · CRA · FastAPI · Django · Flask
+
+### Supported databases
+SQLite (default) · PostgreSQL · MySQL · Turso/libSQL · Cloudflare D1
+
+---
+
+## 📖 Docs
+
+**[llama-farm.github.io/corral](https://llama-farm.github.io/corral/)**
+
+- [Quickstart](https://llama-farm.github.io/corral/quickstart.html)
+- [Agent Guide](https://llama-farm.github.io/corral/agents.html)
+- [CLI Reference](https://llama-farm.github.io/corral/cli.html)
+- [Frameworks](https://llama-farm.github.io/corral/frameworks.html)
+- [Billing](https://llama-farm.github.io/corral/billing.html)
+- [Gating](https://llama-farm.github.io/corral/gating.html)
+- [Deploy](https://llama-farm.github.io/corral/deployment.html)
+- [llms.txt](https://llama-farm.github.io/corral/llms.txt) — agent-readable spec
+
+---
+
+## License
+
+[MIT](LICENSE) © [LlamaFarm](https://github.com/llama-farm)
+
+*Built for agents, works for humans too* 🦙
