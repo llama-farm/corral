@@ -24,6 +24,7 @@ function bootstrapDatabase(filePath: string) {
       email TEXT NOT NULL UNIQUE,
       emailVerified INTEGER NOT NULL DEFAULT 0,
       image TEXT,
+      plan TEXT NOT NULL DEFAULT 'free',
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
       role TEXT DEFAULT 'user',
@@ -112,10 +113,68 @@ export const auth = betterAuth({
   },
 
   // LEARNING #5: trustedOrigins required for sign-out CSRF protection.
-  // Include all origins that will make auth requests.
-  trustedOrigins: (process.env.TRUSTED_ORIGINS || "http://localhost:3000,http://localhost:5173")
-    .split(",")
-    .flatMap(o => [o.trim(), o.trim().replace("localhost", "127.0.0.1")]),
+  // Auto-detects frontend port from env. Add TRUSTED_ORIGINS (comma-separated) for production.
+  trustedOrigins: (() => {
+    const frontendPort = process.env.FRONTEND_PORT || process.env.PORT || "{{PORT}}";
+    const base = [
+      `http://localhost:${frontendPort}`,
+      `http://127.0.0.1:${frontendPort}`,
+      process.env.APP_URL,
+    ];
+    const extra = (process.env.TRUSTED_ORIGINS || "")
+      .split(",").map(o => o.trim()).filter(Boolean);
+    return [...base, ...extra].filter(Boolean) as string[];
+  })(),
 });
 
 export type Session = typeof auth.$Infer.Session;
+
+// ─── Auto-seed admin user on first boot ─────────────────────────────
+// Reads seed config from corral.yaml. Only runs once (idempotent).
+(async () => {
+  try {
+    const existing = db.prepare('SELECT id FROM "user" WHERE role = ?').get('admin');
+    if (existing) return;
+
+    const fs = await import('fs');
+    const { createHash, scryptSync, randomBytes } = await import('crypto');
+
+    // Find corral.yaml
+    const yamlPaths = ['corral.yaml', '../corral.yaml', '../frontend/corral.yaml'];
+    let seedEmail = '', seedPassword = '', seedName = 'Admin', seedPlan = '{{DEFAULT_PAID_PLAN}}';
+
+    for (const p of yamlPaths) {
+      const resolved = path.resolve(process.cwd(), p);
+      if (fs.existsSync(resolved)) {
+        const content = fs.readFileSync(resolved, 'utf-8');
+        const emailMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?email:\s*(\S+)/);
+        const passMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?password:\s*(\S+)/);
+        const nameMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?name:\s*(.+)/);
+        if (emailMatch) seedEmail = emailMatch[1];
+        if (passMatch) seedPassword = passMatch[1];
+        if (nameMatch) seedName = nameMatch[1].trim();
+        break;
+      }
+    }
+
+    if (!seedEmail || !seedPassword) return;
+
+    // Hash password with scrypt
+    const salt = randomBytes(16).toString('hex');
+    const hash = scryptSync(seedPassword, salt, 64).toString('hex');
+    const hashedPassword = `${salt}:${hash}`;
+
+    const userId = createHash('sha256').update(seedEmail).digest('hex').slice(0, 32);
+    const accountId = createHash('sha256').update(seedEmail + ':credential').digest('hex').slice(0, 32);
+    const now = new Date().toISOString();
+
+    db.prepare(`INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, role, plan, createdAt, updatedAt) VALUES (?, ?, ?, 0, 'admin', ?, ?, ?)`)
+      .run(userId, seedName, seedEmail, seedPlan || 'free', now, now);
+    db.prepare(`INSERT OR IGNORE INTO "account" (id, userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, ?, 'credential', ?, ?, ?)`)
+      .run(accountId, userId, seedEmail, hashedPassword, now, now);
+
+    console.log(`🤠 Corral: Seeded admin → ${seedEmail} (role=admin, plan=${seedPlan || 'free'})`);
+  } catch (e) {
+    // Silent — seeding is best-effort on startup
+  }
+})();

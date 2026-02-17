@@ -2,14 +2,27 @@ import { z } from 'zod';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { parse, stringify } from 'yaml';
 
+// ─── Plan ─────────────────────────────────────────────────────────────────────
+// Matches the array format written by `corral add plan`:
+//   name, display_name, price, interval, stripe_price_id, features, cta, trial_days, popular
+// Also accepts legacy record format under billing.plans.
 const PlanSchema = z.object({
   name: z.string(),
+  display_name: z.string().optional(),
   price: z.number().optional(),
+  interval: z.string().optional(),
   stripe_price_id: z.string().optional(),
   features: z.array(z.string()).optional(),
+  cta: z.string().optional(),
+  trial_days: z.number().optional(),
+  popular: z.boolean().optional(),
   limits: z.record(z.number()).optional(),
 });
 
+// ─── Meter ────────────────────────────────────────────────────────────────────
+// Matches the structure written by `corral add meter`:
+//   label, unit, type, reset_period, limits, warning_at, nudge
+// Also accepts legacy fields: name, event, plan, limit, stripe_meter_id
 const MeterSchema = z.object({
   label: z.string().optional(),
   unit: z.string().optional(),
@@ -46,32 +59,76 @@ const SeedUserSchema = z.object({
   plan: z.string().optional(),
 });
 
+// ─── Main Config Schema ───────────────────────────────────────────────────────
+// Supports:
+//   - plans as top-level array (written by `corral add plan`)  ← primary
+//   - plans as billing.plans record (legacy)
+//   - features as top-level record
+//   - meters as top-level record
 export const ConfigSchema = z.object({
   app: z.object({
     name: z.string(),
     id: z.string(),
     url: z.string().optional(),
+    domain: z.string().optional(),
+    framework: z.string().optional(),
+    logo: z.string().optional(),
+    support_email: z.string().optional(),
+    icon: z.string().optional(),
   }),
+
   database: z.object({
-    adapter: z.string().optional(),
+    adapter: z.string().optional(),           // sqlite | pg | mysql | turso | d1
     url: z.string(),
     auto_migrate: z.boolean().optional(),
   }).optional(),
+
   auth: z.object({
+    server_url: z.string().optional(),
     providers: z.array(z.string()).optional(),
+    social: z.union([z.array(z.string()), z.record(z.boolean())]).optional(),
+    methods: z.record(z.union([z.boolean(), z.record(z.unknown())])).optional(),
+    email: z.record(z.unknown()).optional(),
+    session: z.object({
+      max_age: z.number().optional(),
+      update_age: z.number().optional(),
+    }).optional(),
+    trusted_origins: z.array(z.string()).optional(),
     session_expiry: z.string().optional(),
   }).optional(),
+
+  // ── Top-level plans array (primary format from `corral add plan`) ──
+  plans: z.array(PlanSchema).optional(),
+
+  // ── Top-level features record ──
+  // Values: array of plan names, or "*" / "authenticated" special strings
+  features: z.record(z.union([z.array(z.string()), z.string()])).optional(),
+
   billing: z.object({
     provider: z.string().optional(),
     stripe_secret_key_env: z.string().optional(),
+    stripe: z.object({
+      require_payment_method: z.boolean().optional(),
+    }).optional(),
+    currency: z.string().optional(),
+    trial_days: z.number().optional(),
+    cancel_behavior: z.string().optional(),
+    // Legacy: plans as record under billing
     plans: z.record(PlanSchema).optional(),
   }).optional(),
+
   meters: z.record(MeterSchema).optional(),
   nudges: z.array(NudgeSchema).optional(),
+
   seed: z.object({
     auto_seed_dev: z.boolean().optional(),
     admin: SeedUserSchema.optional(),
     test_users: z.array(SeedUserSchema).optional(),
+  }).optional(),
+
+  admin: z.object({
+    path: z.string().optional(),
+    require_role: z.string().optional(),
   }).optional(),
 });
 
@@ -102,22 +159,38 @@ export function validateConfig(config: unknown): { valid: boolean; errors: strin
   if (result.success) {
     const errors: string[] = [];
     const c = result.data;
-    // Check plans have stripe_price_id if billing configured
-    if (c.billing?.plans) {
-      for (const [key, plan] of Object.entries(c.billing.plans)) {
-        if (plan.price && !plan.stripe_price_id) {
-          errors.push(`Plan "${key}" has price but no stripe_price_id`);
+
+    // Check top-level plans array for stripe_price_id
+    if (c.plans) {
+      for (const plan of c.plans) {
+        if (plan.price && plan.price > 0 && !plan.stripe_price_id) {
+          errors.push(`Plan "${plan.name}" has price but no stripe_price_id — run: corral stripe push`);
         }
       }
     }
-    // Check meters reference valid plans
-    if (c.meters && c.billing?.plans) {
+
+    // Check billing.plans record (legacy format)
+    if (c.billing?.plans) {
+      for (const [key, plan] of Object.entries(c.billing.plans)) {
+        if (plan.price && plan.price > 0 && !plan.stripe_price_id) {
+          errors.push(`Plan "${key}" has price but no stripe_price_id — run: corral stripe push`);
+        }
+      }
+    }
+
+    // Check meters reference valid plans (top-level plans array)
+    const planNames = new Set([
+      ...(c.plans?.map(p => p.name) ?? []),
+      ...Object.keys(c.billing?.plans ?? {}),
+    ]);
+    if (c.meters) {
       for (const [key, meter] of Object.entries(c.meters)) {
-        if (meter.plan && !c.billing.plans[meter.plan]) {
+        if (meter.plan && planNames.size > 0 && !planNames.has(meter.plan)) {
           errors.push(`Meter "${key}" references unknown plan "${meter.plan}"`);
         }
       }
     }
+
     return { valid: errors.length === 0, errors };
   }
   return {

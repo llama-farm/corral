@@ -1,10 +1,10 @@
 # Corral — Agent-Native Auth + Payments
 
-> Corral adds authentication, Stripe billing, and feature gating to any app via a single YAML config and CLI.
-> You (the AI agent) can set up complete auth + payments for a project using just the CLI commands below.
-> No manual wiring required. Read this file, run the commands, done.
+> **You (the AI agent) can set up complete authentication, billing, and feature gating
+> for any Node.js project using just the CLI commands below. No manual wiring required.**
 >
-> Designed for: OpenClaw, Claude Code, Codex, Cursor, and any AI coding assistant.
+> Read this file, run the commands, the app works immediately.
+> Built for: OpenClaw, Claude Code, Codex, Cursor, and any AI coding assistant.
 >
 > Open-source SDK. Embedded in your app (not a hosted service). MIT license.
 > Built on Better Auth + Stripe.
@@ -13,45 +13,117 @@
 > Docs: https://docs.llamafarm.dev/corral/
 > Version: 0.1.0
 
+---
+
 ## Quick Start (for agents)
 
-> 1. Run: `npx create-corral init` (in the project directory)
-> 2. Edit `corral.yaml` with the user's desired plans, features, and auth providers
-> 3. Run: `npx create-corral doctor`
-> That's it. The app now has auth + payments.
-
-Full 9-command workflow (use this for complete setup):
-
 ```bash
-npx create-corral analyze --json              # 1. detect framework/database (read-only)
-npx create-corral init                        # 2. scaffold all files + install deps
-npx create-corral add provider google         # 3. add OAuth provider
-npx create-corral add plan pro --price 29 --trial 14  # 4. add paid plan
-npx create-corral add feature ai_tools --plan pro     # 5. gate a feature to a plan
-npx create-corral add meter api_calls --free 500 --pro 10000 --team 50000  # 6. usage meter
-npx create-corral add page dashboard/analytics --gated pro  # 7. gated page
-npx create-corral add device-verify           # 8. CLI auth page
-npx create-corral doctor                      # 9. verify everything
+create-corral init                        # scaffold auth + billing + admin panel + profile
+create-corral add plan pro --price 29 --trial 14
+create-corral add meter api_calls --limit 500 --plan free
+create-corral stripe push                 # sync plans to Stripe (needs STRIPE_SECRET_KEY)
+create-corral doctor                      # verify everything
 ```
 
-All commands use `npx create-corral <command>`. All accept `--json` for structured output.
+> **Note:** Use `create-corral` (not `npx create-corral`) if the package is globally linked.
+> Use `npx create-corral` if running from the npm registry.
+> All commands are identical either way.
 
-## What Corral Is
+After `init`, the app has:
+- ✅ Email/password sign-up and sign-in
+- ✅ Admin panel at `/admin` (seed admin user auto-created from corral.yaml)
+- ✅ User profile page at `/profile` (or `/account`)
+- ✅ Billing upgrade flow (pricing page + Stripe checkout)
+- ✅ Session management
+- ✅ All auth endpoints under `/api/auth/`
 
-Corral is a library that adds auth, billing, and feature gating to any Node.js app
-from a single YAML config file (`corral.yaml`). It mounts as route handlers inside
-your existing app — no Docker, no separate service, no per-MAU pricing.
+---
 
-Key properties (important for agents):
-- One config file (`corral.yaml`) defines everything — edit YAML, not code
-- Shares your app's existing database (SQLite default, PostgreSQL/MySQL/Turso supported)
-- Mounts at `/api/auth` in your app
-- Every CLI command has `--json` output for structured agent parsing
-- Generates `CORRAL.md` (project-specific agent guide) on init
-- All `corral add` commands are idempotent — safe to run twice
-- Exit code 0 = success, 1 = error with details
+## CRITICAL: Don't Duplicate What Corral Already Provides
 
-## corral.yaml Structure
+**DON'T** scaffold a separate auth server if one already exists.
+**DON'T** write custom auth middleware — Corral mounts it for you.
+**DON'T** create login/signup pages manually — Corral generates them.
+
+**DO** run `create-corral init` and let it detect your framework.
+**DO** run `create-corral doctor` to verify — it tells you exactly what's wrong.
+**DO** edit `corral.yaml` for all config changes; never edit generated files directly.
+
+---
+
+## What `create-corral init` Generates
+
+For **Express** projects:
+```
+corral.yaml                              — main config (the ONE file you edit)
+CORRAL.md                                — this project's agent guide (auto-updated)
+lib/corral.ts                            — Better Auth setup + DB bootstrap
+server/auth.ts                           — Express auth server (mount into your app)
+.env                                     — BETTER_AUTH_SECRET + BETTER_AUTH_URL
+```
+
+For **Hono** projects:
+```
+corral.yaml
+CORRAL.md
+lib/corral.ts
+src/routes/auth.ts                       — Hono auth route handler
+.env
+```
+
+For **Next.js** projects:
+```
+corral.yaml
+CORRAL.md
+lib/corral.ts
+app/api/auth/[...all]/route.ts           — catch-all route handler
+.env.local
+```
+
+Files added by subsequent `add` commands:
+```
+app/api/webhooks/stripe/route.ts         — from: corral add webhook
+app/device/verify/page.tsx               — from: corral add device-verify
+src/pages/<Name>.tsx                     — from: corral add page <path>
+```
+
+---
+
+## For Monorepos / Projects with an Existing Server
+
+Corral **auto-detects** your existing Express or Hono server and mounts into it.
+It does NOT create a parallel server. It adds mount instructions to your existing one.
+
+Example: if you have `server/index.ts` with Express, Corral adds:
+```typescript
+import { auth } from './lib/corral.js';
+import { toNodeHandler } from 'better-auth/node';
+
+const authHandler = toNodeHandler(auth);
+app.all('/api/auth/*', (req, res) => authHandler(req, res));
+```
+
+---
+
+## CRITICAL: Express Route Syntax
+
+**Express 4 uses `/*` — NOT `/*splat`** (that is Express 5 syntax).
+
+```typescript
+// ✅ CORRECT (Express 4)
+app.all('/api/auth/*', (req, res) => authHandler(req, res));
+
+// ❌ WRONG (Express 5 only)
+app.all('/api/auth/*splat', (req, res) => authHandler(req, res));
+```
+
+If you see `/*splat` anywhere in generated files, replace it with `/*`.
+
+---
+
+## corral.yaml — The Config File
+
+Everything is controlled from `corral.yaml`. Edit this file, not the generated TypeScript.
 
 ```yaml
 app:
@@ -59,173 +131,264 @@ app:
   id: myapp
   domain: http://localhost:3000
 
+database:
+  adapter: sqlite              # sqlite | pg | mysql | turso | d1
+  url: ./corral.db
+  auto_migrate: true
+
 auth:
   methods:
     email_password: true
-    google: true
-    github: true
-  session:
-    max_age: 2592000
+    # google: true             # Add providers with: corral add provider google
+    # github: true
 
-plans:
-  - name: free
-    price: 0
-    features: [basic_access]
-  - name: pro
-    price: 29
-    interval: month
-    trial_days: 14
-    features: [ai_tools, analytics, export]
-  - name: team
-    price: 99
-    interval: month
-    features: [ai_tools, analytics, export, team_sharing]
+plans: []                      # Start empty; use: corral add plan <name> --price <n>
+  # Example after adding plans:
+  # - name: free
+  #   display_name: Free
+  #   price: 0
+  #   features: [Everything in free]
+  #   cta: Get Started
+  # - name: pro
+  #   display_name: Pro
+  #   price: 29
+  #   interval: month
+  #   trial_days: 14
+  #   stripe_price_id: price_xxx  # auto-filled by: corral stripe push
+  #   features: [Unlimited access, Priority support]
+  #   cta: Start Free Trial
 
-features:
-  basic_access: ["*"]           # everyone including anonymous
-  ai_tools: [pro, team]        # pro and team plans
-  team_sharing: [team]          # team plan only
-
-meters:
-  api_calls:
-    limits:
-      free: 500
-      pro: 10000
-      team: 50000
-    warning_at: 0.8
+features: {}
+  # feature_name: ["plan1", "plan2"]   # who can access this feature
+  # browse: ["*"]                        # anyone including anonymous
+  # export: ["pro", "team"]             # pro and team plans only
 
 billing:
   provider: stripe
+  currency: usd
   cancel_behavior: end_of_period
 
-database:
-  adapter: sqlite
-  url: file:./corral.db
+meters: {}
+  # meter_name:
+  #   label: Human Label
+  #   unit: requests
+  #   type: cap
+  #   reset_period: month         # month | day
+  #   limits:
+  #     free: 100
+  #     pro: 10000
+  #   warning_at: 0.8
+
+seed:
+  admin:
+    email: admin@example.com
+    password: admin123
+    name: Admin
+  # test_users:
+  #   - email: user@example.com
+  #     password: test123
+  #     plan: pro
+
+admin:
+  path: /admin
+  require_role: admin
 ```
+
+---
 
 ## CLI Commands
 
-All commands accept `--json` and `--help`. Use `npx create-corral <command>`.
+All commands accept `--json` for structured output and `--help` for details.
 
-### Setup
-- `analyze [--json]`                     — detect project framework/database (read-only)
-- `init [--db sqlite|pg|mysql|turso|d1]` — scaffold Corral into project, install deps
-- `doctor`                               — deep health check (config + env + deps)
-- `validate [--json]`                    — runtime validation (hits endpoints)
-- `status [--json]`                      — show users, plans, MRR, Stripe status
+### Setup Commands
+```bash
+create-corral analyze [--json]               # detect framework/database (read-only)
+create-corral init [--db sqlite|pg|mysql|turso|d1] [--server express|hono]
+create-corral doctor                         # deep health check: config + env + deps + DB
+create-corral status [--json]                # show users, plans, MRR, Stripe status
+```
 
-### Add capabilities (all idempotent)
-- `add page <path> [--gated <plan>]`     — create a page (--gate also works)
-- `add feature <name> --plan <plan>`     — gate a feature to plan(s) (comma-separated)
-- `add meter <name> --limit <n> --plan <p>` — add usage meter for any plan name (repeat for each plan)
-- `add meter <name> --free <n> --pro <n> --team <n>` — shorthand for common plan names
-- `add provider <name>`                  — add OAuth provider (google, github, etc.)
-- `add plan <name> --price <n> [--trial <days>] [--features <list>] [--cta <text>]`
-- `add webhook`                          — generate Stripe webhook handler
-- `add device-verify`                    — generate CLI device auth page
-- `add admin-page`                       — generate admin dashboard page
+### Add Commands (all idempotent — safe to run multiple times)
+```bash
+# Plans
+create-corral add plan <name> \
+  --price <n>              # monthly price in USD (required)
+  [--trial <days>]         # free trial days
+  [--cta <text>]           # button text (default: "Subscribe" or "Start Free Trial")
+  [--features <list>]      # comma-separated feature bullet points
+  [--highlighted]          # mark as popular/recommended
+
+# Features (access control)
+create-corral add feature <name> --plan <plan>
+# --plan accepts comma-separated: --plan "pro,team"
+
+# Usage meters
+create-corral add meter <name> --limit <n> --plan <plan>
+# Or shorthand for common plan names:
+create-corral add meter <name> --free <n> --pro <n> --team <n>
+
+# Pages
+create-corral add page <path> [--gated <plan>]
+# Creates app/<path>/page.tsx (Next.js) or src/pages/<Name>.tsx (SPA)
+
+# Auth providers
+create-corral add provider google   # also: github, discord, apple, microsoft, twitter
+
+# Other
+create-corral add webhook            # Stripe webhook handler
+create-corral add device-verify      # CLI device auth page (RFC 8628)
+create-corral add admin-page         # admin dashboard page
+```
 
 ### Stripe
-- `stripe push [--json]`                — sync corral.yaml plans to Stripe products/prices
+```bash
+create-corral stripe push [--json]
+# Reads corral.yaml plans, creates/finds Stripe products + prices,
+# writes stripe_price_id back to corral.yaml.
+# Requires: STRIPE_SECRET_KEY env var (sk_test_... or sk_live_...)
+# Skips free plans (price: 0).
+# Idempotent: safe to run multiple times.
+```
 
 ### Development
-- `seed`                                 — seed database with test users
-- `dev`                                  — start standalone auth dev server
-- `rollback [--list]`                    — undo last init/add operation
-- `llms-txt [--output <path>] [--full]`  — generate llms.txt from config
+```bash
+create-corral seed                   # seed database with users from corral.yaml seed config
+create-corral dev                    # start standalone auth dev server
+create-corral rollback [--list]      # undo last init/add operation
+```
 
-## Auth Providers
+---
 
-Supported: google, github, discord, apple, microsoft, twitter, facebook,
-           gitlab, linkedin, email (password + magic_link + otp)
+## Doctor — What It Checks
 
-Device auth: CLI-to-browser OAuth2 device flow.
-CLI prints code → user approves in browser → CLI gets long-lived token.
+`create-corral doctor` verifies:
+- `corral.yaml` exists and parses without errors
+- Required env vars are set (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`)
+- All npm deps are installed (`better-auth`, `@llamafarm/corral`, database driver)
+- Database is reachable and tables exist
+- Stripe key is valid (if billing configured)
+- Plans with prices have `stripe_price_id` set
+- Auth endpoints respond (GET `/api/auth/ok` → 200)
 
-## HTTP API
+Run `doctor` after `init` and after any major change. Fix everything it reports.
 
-Base: `/api/auth` (Better Auth) and `/api/corral` (billing/device/usage)
+---
 
-### Auth (Better Auth endpoints)
+## Admin User — Auto-Seeded
+
+On first server boot, Corral reads `corral.yaml` → `seed.admin` and creates the admin user automatically.
+No manual `INSERT` needed.
+
+```yaml
+seed:
+  admin:
+    email: admin@yourapp.com
+    password: yourpassword
+    name: Admin
+```
+
+The admin user gets `role: admin` and can access the admin panel at `/admin`.
+
+---
+
+## After `init` — How to Test
+
+1. **Sign up:** POST `/api/auth/sign-up/email` `{ email, password, name }`
+   or visit the generated signup page
+2. **Sign in:** POST `/api/auth/sign-in/email` `{ email, password }`
+3. **Admin panel:** visit `/admin` (signed in as the seed admin)
+4. **Profile page:** visit `/profile` or `/account`
+5. **Upgrade flow:** visit the pricing page → click a plan → Stripe checkout
+6. **Health check:** GET `/api/auth/ok` → `{ ok: true }`
+
+---
+
+## HTTP API Reference
+
+Base paths: `/api/auth` (Better Auth) and `/api/corral` (billing/device/usage)
+
+### Auth
 - `POST /api/auth/sign-up/email` — `{ email, password, name }`
 - `POST /api/auth/sign-in/email` — `{ email, password }`
 - `POST /api/auth/sign-out`
-- `GET  /api/auth/get-session` — returns user + session (requires cookie or Bearer token)
+- `GET  /api/auth/get-session`   — returns user + session
+- `GET  /api/auth/ok`            — health check → `{ ok: true }`
 - `GET  /api/auth/sign-in/social?provider=google&callbackURL=/`
 
 ### Billing
-- `POST /api/corral/checkout` — `{ planId }` → `{ url }` (Stripe checkout URL)
-- `GET  /api/corral/billing` — subscription + invoices
-- `POST /api/corral/cancel` — cancel at period end
-- `POST /api/corral/reactivate` — undo cancel
-- `GET  /api/corral/subscription/status` — `{ plan, role }` (for CLI polling)
-
-### Device Auth (for CLI tools)
-- `POST /api/corral/device/authorize` → `{ deviceCode, userCode, verificationUrl }`
-- `POST /api/corral/device/token` `{ deviceCode }` → `{ accessToken, refreshToken }` (poll until approved)
-- `POST /api/corral/device/verify` `{ userCode, action: "approve" }` (browser calls this)
-- `POST /api/corral/device/refresh` `{ refreshToken }` → new tokens (rotation)
-
-### API Keys
-- `POST   /api/corral/apikeys` `{ name }` → `{ id, key, prefix }` (key shown once)
-- `GET    /api/corral/apikeys` → list (prefix only)
-- `DELETE /api/corral/apikeys/:id` — revoke
+- `POST /api/corral/checkout`             — `{ planId }` → `{ url }` (Stripe checkout)
+- `GET  /api/corral/billing`              — subscription + invoices
+- `POST /api/corral/cancel`               — cancel at period end
+- `POST /api/corral/reactivate`           — undo cancel
+- `GET  /api/corral/subscription/status`  — `{ plan, role }`
 
 ### Usage Meters
-- `POST /api/corral/usage/track` `{ meterId, count }` — increment
-- `GET  /api/corral/usage/:meterId` → `{ used, limit, remaining, resetAt }`
-- `GET  /api/corral/usage` — all meters for current user
+- `POST /api/corral/usage/track`   — `{ meterId, count }` — increment
+- `GET  /api/corral/usage/:meterId` — `{ used, limit, remaining, resetAt }`
+- `GET  /api/corral/usage`          — all meters for current user
+
+### Device Auth (CLI → browser OAuth2, RFC 8628)
+- `POST /api/corral/device/authorize` → `{ deviceCode, userCode, verificationUrl }`
+- `POST /api/corral/device/token`     — `{ deviceCode }` → poll until approved
+- `POST /api/corral/device/verify`    — `{ userCode, action: "approve" }` (browser)
+- `POST /api/corral/device/refresh`   — `{ refreshToken }` → new tokens
+
+### API Keys
+- `POST   /api/corral/apikeys`     — `{ name }` → `{ id, key, prefix }` (key shown once)
+- `GET    /api/corral/apikeys`     — list (prefix only, not full key)
+- `DELETE /api/corral/apikeys/:id` — revoke
 
 ### Admin (requires role: admin)
 - `GET /api/auth/admin/list-users` — paginated user list
 
-## Files Generated by `corral init`
-
-For Next.js (app router):
-```
-corral.yaml                              — main config (edit this)
-CORRAL.md                                — agent guide (auto-generated)
-lib/corral.ts                            — Better Auth setup + DB bootstrap
-app/api/auth/[...all]/route.ts           — auth route handler
-.env.local                               — BETTER_AUTH_SECRET + URL
-```
-
-Additional files from `corral add`:
-```
-app/api/webhooks/stripe/route.ts         — from: corral add webhook
-app/device/verify/page.tsx               — from: corral add device-verify
-app/<path>/page.tsx                      — from: corral add page <path>
-```
+---
 
 ## Environment Variables
 
-Required (set in .env.local):
-  `BETTER_AUTH_SECRET`   — random string for session signing (auto-generated by init)
-  `BETTER_AUTH_URL`      — app URL (default: http://localhost:3000)
+```env
+# Required
+BETTER_AUTH_SECRET=<min 32 chars — generate: openssl rand -base64 32>
+BETTER_AUTH_URL=http://localhost:3000
 
-Billing (if using Stripe):
-  `STRIPE_SECRET_KEY`    — sk_test_... or sk_live_...
-  `STRIPE_PUBLISHABLE_KEY` — pk_test_... or pk_live_...
-  `STRIPE_WEBHOOK_SECRET` — whsec_...
+# Stripe (required for billing)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
-Auth providers (per provider):
-  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-  `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+# OAuth providers (per provider)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+```
 
-## Databases Supported
+---
 
-sqlite (default), postgresql, mysql, turso/libsql, cloudflare-d1
-Use `corral init --db <type>` to select.
+## Databases
 
-## Multi-Language Backend Validation
+| Adapter | Driver Package | Notes |
+|---------|---------------|-------|
+| `sqlite` | `better-sqlite3` | Default. File-based. |
+| `pg` | `pg` | PostgreSQL |
+| `mysql` | `mysql2` | MySQL / MariaDB |
+| `turso` | `@libsql/client` | Turso / libSQL |
+| `d1` | built-in | Cloudflare D1 (edge) |
 
-Non-Node backends can validate Corral sessions by reading the shared database:
+Select with: `create-corral init --db <adapter>`
+
+---
+
+## Multi-Language Backend Session Validation
+
+Non-Node backends can validate Corral sessions via the shared database:
 - Python: `corral/validation/python/` — FastAPI/Flask/Django middleware
 - Go: `corral/validation/go/` — stdlib middleware
 - Rust: `corral/validation/rust/` — Axum extractor
 - Ruby: `corral/validation/ruby/` — Rack middleware
 
-These read the `session` + `user` tables. All auth operations go through the Node server.
+These read the `session` + `user` tables directly. All auth writes go through the Node server.
+
+---
 
 ## More
 

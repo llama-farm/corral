@@ -1,5 +1,6 @@
 import ora from 'ora';
 import chalk from 'chalk';
+import { execSync } from 'child_process';
 import { loadConfig, loadConfigRaw, saveConfig } from '../config.js';
 import { success, info, error as logError, warn, jsonOutput } from '../util.js';
 
@@ -20,21 +21,41 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
     return;
   }
 
+  // Load Stripe — try project-local install first (via createRequire), then ESM import.
+  // If missing, auto-install and retry.
   let Stripe: any;
-  try {
-    const { createRequire } = await import('module');
-    const req = createRequire(process.cwd() + '/package.json');
-    Stripe = req('stripe');
-  } catch {
+  async function tryLoadStripe(): Promise<any | null> {
     try {
-      Stripe = (await import('stripe')).default;
+      const { createRequire } = await import('module');
+      const req = createRequire(process.cwd() + '/package.json');
+      return req('stripe');
     } catch {
-      logError('stripe package not installed. Run: npm install stripe');
+      try {
+        return (await import('stripe')).default;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  Stripe = await tryLoadStripe();
+  if (!Stripe) {
+    if (!opts.json) info('stripe package not found — installing...');
+    try {
+      execSync('npm install stripe', { stdio: opts.json ? 'pipe' : 'inherit' });
+      if (!opts.json) success('Installed stripe');
+      Stripe = await tryLoadStripe();
+    } catch {
+      // ignore install error
+    }
+    if (!Stripe) {
+      logError('Failed to load stripe. Run: npm install stripe');
       return;
     }
   }
 
   const stripe = Stripe(stripeKey);
+
   // Support both top-level plans array and billing.plans record
   let plans: Record<string, any> = {};
   if (Array.isArray(rawConfig.plans)) {
@@ -46,6 +67,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
   } else if (rawConfig.billing?.plans && typeof rawConfig.billing.plans === 'object') {
     plans = rawConfig.billing.plans;
   }
+
   const results: { plan: string; action: string; priceId: string }[] = [];
 
   if (!opts.json) {
@@ -57,6 +79,14 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
       if (!opts.json) info(`Skipping ${key} (free plan)`);
       continue;
     }
+
+    const displayName = plan.display_name || (key.charAt(0).toUpperCase() + key.slice(1));
+    const price = plan.price as number;
+    const trialDays = plan.trial_days as number | undefined;
+    const interval = plan.interval || 'month';
+
+    const trialStr = trialDays ? `, ${trialDays}-day trial` : '';
+    const humanLabel = `${displayName} ($${price}/mo${trialStr})`;
 
     const spinner = opts.json ? null : ora(`Syncing ${key}...`).start();
 
@@ -70,23 +100,31 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
       if (existingProducts.data.length > 0) {
         product = existingProducts.data[0];
         // Update name if changed
-        const displayName = plan.display_name || plan.name;
         if (product.name !== displayName) {
-          const updated = await stripe.products.update(product.id, { name: displayName });
-          product = updated;
+          product = await stripe.products.update(product.id, {
+            name: displayName,
+            metadata: {
+              corral_plan_id: key,
+              ...(trialDays ? { trial_days: String(trialDays) } : {}),
+            },
+          });
         }
         if (spinner) spinner.text = `Found product: ${product.id}`;
       } else {
+        if (spinner) spinner.text = `Creating Stripe product: ${humanLabel}`;
         product = await stripe.products.create({
-          name: plan.display_name || plan.name,
-          metadata: { corral_plan_id: key },
+          name: displayName,
+          metadata: {
+            corral_plan_id: key,
+            ...(trialDays ? { trial_days: String(trialDays) } : {}),
+          },
         });
+        if (!opts.json) info(`Creating Stripe product: ${humanLabel}`);
         if (spinner) spinner.text = `Created product: ${product.id}`;
       }
 
       // 2. Find or create price
-      const amountCents = Math.round(plan.price * 100);
-      const interval = 'month'; // Default to monthly
+      const amountCents = Math.round(price * 100);
 
       let priceId: string = plan.stripe_price_id || '';
       if (priceId) {
@@ -103,7 +141,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
         }
       }
 
-      // Search for matching active price
+      // Search for matching active price on this product
       const existingPrices = await stripe.prices.list({
         product: product.id!,
         active: true,
@@ -126,11 +164,11 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
           recurring: { interval },
         });
         priceId = newPrice.id;
-        spinner?.succeed(`${key}: created price ${priceId}`);
+        spinner?.succeed(chalk.green(`${key}: created price ${priceId}`));
         results.push({ plan: key, action: 'created', priceId });
       }
 
-      // 3. Write back to config (support both array and record format)
+      // 3. Write back stripe_price_id to config (support both array and record format)
       if (Array.isArray(rawConfig.plans)) {
         const planEntry = rawConfig.plans.find((p: any) => p.name === key);
         if (planEntry) planEntry.stripe_price_id = priceId;
@@ -147,7 +185,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
     }
   }
 
-  // Save updated config
+  // Save updated config with written-back price IDs
   try {
     saveConfig(opts.config, rawConfig);
     if (!opts.json) success('Updated corral.yaml with Stripe price IDs');

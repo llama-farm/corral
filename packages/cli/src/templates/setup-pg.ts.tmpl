@@ -98,7 +98,69 @@ bootstrapDatabase(pool).catch(err => {
   // Don't crash — tables may already exist
 });
 
-const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+// ─── Auto-seed admin user on first run ─────────────────────────────
+// Set SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD in .env to auto-create admin.
+async function seedAdminIfNeeded() {
+  let adminEmail = process.env.SEED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "";
+  let adminPassword = process.env.SEED_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "";
+  let adminName = "Admin";
+  let adminPlan = "{{DEFAULT_PAID_PLAN}}" || "free";
+
+  // Read from corral.yaml if env vars not set
+  const fs = await import("fs");
+  const pathMod = await import("path");
+  for (const p of ["corral.yaml", "../corral.yaml", "../frontend/corral.yaml"]) {
+    const resolved = pathMod.resolve(process.cwd(), p);
+    if (fs.existsSync(resolved)) {
+      const content = fs.readFileSync(resolved, "utf-8");
+      const em = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?email:\s*(\S+)/);
+      const pm = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?password:\s*(\S+)/);
+      const nm = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?name:\s*(.+)/);
+      if (em && !adminEmail) adminEmail = em[1];
+      if (pm && !adminPassword) adminPassword = pm[1];
+      if (nm) adminName = nm[1].trim();
+      break;
+    }
+  }
+
+  if (!adminEmail || !adminPassword) return;
+
+  const client = await pool.connect();
+  try {
+    const existing = await client.query(`SELECT id FROM "user" WHERE role = 'admin' LIMIT 1`);
+    if (existing.rows.length > 0) return;
+
+    const bcrypt = await import("bcryptjs").catch(() => null);
+    const { createHash } = await import("crypto");
+    const hashedPw = bcrypt
+      ? await bcrypt.default.hash(adminPassword, 12)
+      : createHash("sha256").update(adminPassword).digest("hex");
+
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const accountId = Math.random().toString(36).slice(2);
+    const now = new Date();
+
+    await client.query(
+      `INSERT INTO "user" (id, name, email, "emailVerified", plan, role, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, true, $4, 'admin', $5, $5)`,
+      [id, adminName, adminEmail, adminPlan, now]
+    );
+    await client.query(
+      `INSERT INTO "account" (id, "userId", "accountId", "providerId", password, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'credential', $4, $5, $5)`,
+      [accountId, id, accountId, hashedPw, now]
+    );
+    console.log(`🤠 Corral: Seeded admin user → ${adminEmail} (role=admin)`);
+  } catch (e: any) {
+    console.warn(`🤠 Corral: Could not seed admin: ${e.message}`);
+  } finally {
+    client.release();
+  }
+}
+
+// Auto-detect frontend port for CORS
+const frontendPort = process.env.FRONTEND_PORT || process.env.CLIENT_PORT || "3000";
+const frontendOrigin = process.env.CORS_ORIGIN || `http://localhost:${frontendPort}`;
 
 export const auth = betterAuth({
   // Better Auth auto-detects pg.Pool via "connect" in pool
@@ -118,9 +180,14 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins: [
-    corsOrigin,
-    corsOrigin.replace("localhost", "127.0.0.1"),
-  ],
+    frontendOrigin,
+    frontendOrigin.replace("localhost", "127.0.0.1"),
+    process.env.APP_URL,
+    ...(process.env.TRUSTED_ORIGINS || "").split(",").map(o => o.trim()).filter(Boolean),
+  ].filter(Boolean) as string[],
 });
+
+// Run seed after auth is configured (non-blocking)
+seedAdminIfNeeded().catch(() => {});
 
 export type Session = typeof auth.$Infer.Session;

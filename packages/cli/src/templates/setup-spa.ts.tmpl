@@ -86,6 +86,65 @@ function bootstrapDatabase(filePath: string) {
 
 const db = bootstrapDatabase(dbPath);
 
+// ─── Auto-seed admin user on first run ─────────────────────────────
+// Reads from corral.yaml seed config, then falls back to env vars.
+async function seedAdminIfNeeded() {
+  let adminEmail = process.env.SEED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "";
+  let adminPassword = process.env.SEED_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "";
+  let adminName = "Admin";
+  let adminPlan = "{{DEFAULT_PAID_PLAN}}" || "free";
+
+  // Try reading from corral.yaml
+  const fs = await import("fs");
+  const yamlPaths = ["corral.yaml", "../corral.yaml", "../frontend/corral.yaml"];
+  for (const p of yamlPaths) {
+    const resolved = path.resolve(process.cwd(), p);
+    if (fs.existsSync(resolved)) {
+      const content = fs.readFileSync(resolved, "utf-8");
+      const emailMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?email:\s*(\S+)/);
+      const passMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?password:\s*(\S+)/);
+      const nameMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?name:\s*(.+)/);
+      if (emailMatch && !adminEmail) adminEmail = emailMatch[1];
+      if (passMatch && !adminPassword) adminPassword = passMatch[1];
+      if (nameMatch) adminName = nameMatch[1].trim();
+      break;
+    }
+  }
+
+  if (!adminEmail || !adminPassword) return;
+
+  const existing = db.prepare(`SELECT id FROM "user" WHERE role = 'admin' LIMIT 1`).get();
+  if (existing) return;
+
+  // Use better-auth's API to create the user so password is properly hashed
+  try {
+    const { createHash } = await import("crypto");
+    const bcrypt = await import("bcryptjs").catch(() => null);
+    const hashedPw = bcrypt
+      ? await bcrypt.default.hash(adminPassword, 12)
+      : createHash("sha256").update(adminPassword).digest("hex");
+
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const now = new Date().toISOString();
+    const accountId = Math.random().toString(36).slice(2);
+
+    db.prepare(`INSERT INTO "user" (id, name, email, emailVerified, plan, role, createdAt, updatedAt)
+      VALUES (?, ?, ?, 1, ?, 'admin', ?, ?)`).run(id, adminName, adminEmail, adminPlan, now, now);
+    db.prepare(`INSERT INTO "account" (id, userId, accountId, providerId, password, createdAt, updatedAt)
+      VALUES (?, ?, ?, 'credential', ?, ?, ?)`).run(accountId, id, accountId, hashedPw, now, now);
+
+    console.log(`🤠 Corral: Seeded admin → ${adminEmail} (role=admin, plan=${adminPlan})`);
+  } catch (e: any) {
+    console.warn(`🤠 Corral: Could not seed admin user: ${e.message}`);
+  }
+}
+
+seedAdminIfNeeded().catch(() => {});
+
+// ─── Detect frontend port from env for CORS ─────────────────────────
+const frontendPort = process.env.FRONTEND_PORT || process.env.CLIENT_PORT || "5173";
+const frontendOrigin = process.env.CORS_ORIGIN || `http://localhost:${frontendPort}`;
+
 export const auth = betterAuth({
   // LEARNING #1: Pass the raw Database instance directly.
   // Do NOT use { db, type: "sqlite" } — causes "selectFrom is not a function".
@@ -107,9 +166,10 @@ export const auth = betterAuth({
   // LEARNING #5: trustedOrigins is required for sign-out and CSRF protection.
   // Include both localhost and 127.0.0.1 variants — browsers may send either.
   trustedOrigins: [
-    corsOrigin,
-    corsOrigin.replace("localhost", "127.0.0.1"),
-  ],
+    frontendOrigin,
+    frontendOrigin.replace("localhost", "127.0.0.1"),
+    process.env.APP_URL,
+  ].filter(Boolean) as string[],
 });
 
 export type Session = typeof auth.$Infer.Session;

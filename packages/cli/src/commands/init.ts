@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, readdirSync } from 'fs';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { randomBytes } from 'crypto';
@@ -115,6 +115,134 @@ function detectFramework(): Framework {
   }
 
   return { name: 'unknown', port: 3000, hasRewrites: false, hasProxy: false, isSPA: false, isPython: false };
+}
+
+// ─── Monorepo: Detect Existing Server Workspace ────────────────────
+// When init runs from a frontend workspace (e.g. frontend/ or apps/web/),
+// check if there's already a sibling server workspace with Express/Hono/Fastify.
+// If found, we'll install into that server instead of scaffolding a new one.
+
+interface ExistingServer {
+  path: string;          // relative path from cwd (e.g. "../server")
+  absPath: string;       // absolute resolved path
+  framework: 'express' | 'hono' | 'fastify';
+  entryFile: string;     // e.g. "../server/src/index.ts"
+  srcDir: string;        // e.g. "../server/src"
+}
+
+function detectExistingServer(): ExistingServer | null {
+  const SERVER_ENTRIES = ['src/index.ts', 'src/app.ts', 'src/server.ts', 'index.ts', 'src/main.ts'];
+
+  function checkWorkspace(relPath: string): ExistingServer | null {
+    const pkgPath = join(relPath, 'package.json');
+    if (!existsSync(pkgPath)) return null;
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      const framework = deps['express'] ? 'express' : deps['hono'] ? 'hono' : deps['fastify'] ? 'fastify' : null;
+      if (!framework) return null;
+      for (const entry of SERVER_ENTRIES) {
+        const entryPath = join(relPath, entry);
+        if (existsSync(entryPath)) {
+          const srcDir = join(relPath, entry.includes('src/') ? 'src' : '.');
+          return {
+            path: relPath,
+            absPath: resolve(relPath),
+            framework: framework as ExistingServer['framework'],
+            entryFile: entryPath,
+            srcDir,
+          };
+        }
+      }
+      // No entry file found but server framework detected — use src/ as default
+      const srcDir = existsSync(join(relPath, 'src')) ? join(relPath, 'src') : relPath;
+      return {
+        path: relPath,
+        absPath: resolve(relPath),
+        framework: framework as ExistingServer['framework'],
+        entryFile: join(srcDir, 'index.ts'),
+        srcDir,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // 1. Check parent package.json for workspaces array
+  if (existsSync('../package.json')) {
+    try {
+      const parentPkg = JSON.parse(readFileSync('../package.json', 'utf-8'));
+      const workspaces: string[] = Array.isArray(parentPkg.workspaces)
+        ? parentPkg.workspaces
+        : Array.isArray(parentPkg.workspaces?.packages)
+        ? parentPkg.workspaces.packages
+        : [];
+
+      // Expand globs: handle "apps/*", "packages/*" patterns
+      for (const ws of workspaces) {
+        if (ws.includes('*')) {
+          // Glob: list dirs in the parent pattern dir
+          const base = ws.replace(/\/\*.*$/, '');
+          const baseDir = join('..', base);
+          if (existsSync(baseDir)) {
+            try {
+              for (const entry of readdirSync(baseDir)) {
+                const candidate = join('..', base, entry);
+                const found = checkWorkspace(candidate);
+                if (found) return found;
+              }
+            } catch {}
+          }
+        } else {
+          const found = checkWorkspace(join('..', ws));
+          if (found) return found;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Fallback: check common sibling directory names
+  for (const name of ['server', 'api', 'backend', 'apps/server', 'apps/api', 'packages/server']) {
+    const relPath = join('..', name);
+    const found = checkWorkspace(relPath);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+// ─── Vite Proxy Port Detection ─────────────────────────────────────
+// Read actual server port from existing vite proxy config, env, or package.json.
+function getViteProxyServerPort(fallback: number): number {
+  // 1. Check existing vite.config for proxy target port
+  for (const configFile of ['vite.config.ts', 'vite.config.js', 'vite.config.mjs']) {
+    if (!existsSync(configFile)) continue;
+    const content = readFileSync(configFile, 'utf-8');
+    // Match: target: 'http://localhost:3001' or target: "http://localhost:3001"
+    const portMatch = content.match(/target\s*:\s*['"]https?:\/\/(?:localhost|127\.0\.0\.1):(\d+)['"]/);
+    if (portMatch) return parseInt(portMatch[1]);
+  }
+
+  // 2. Check .env for SERVER_PORT / API_PORT / BACKEND_PORT
+  for (const envFile of ['.env', '.env.local', '.env.development']) {
+    if (!existsSync(envFile)) continue;
+    const content = readFileSync(envFile, 'utf-8');
+    const portMatch = content.match(/(?:SERVER_PORT|API_PORT|BACKEND_PORT|CORRAL_PORT)\s*=\s*(\d+)/);
+    if (portMatch) return parseInt(portMatch[1]);
+  }
+
+  // 3. Check sibling server package.json scripts for PORT= env
+  for (const serverPkg of ['../server/package.json', '../api/package.json']) {
+    if (!existsSync(serverPkg)) continue;
+    try {
+      const pkg = JSON.parse(readFileSync(serverPkg, 'utf-8'));
+      const scripts = Object.values(pkg.scripts || {}).join(' ');
+      const portMatch = scripts.match(/PORT=(\d+)/);
+      if (portMatch) return parseInt(portMatch[1]);
+    } catch {}
+  }
+
+  return fallback;
 }
 
 function replaceVars(tmpl: string, vars: Record<string, string>): string {
@@ -418,6 +546,63 @@ function injectAgentBreadcrumbs(configPath: string): void {
 
   // e. public/.well-known/llms.txt (Next.js static file)
   writeProjectLlmsTxt(configPath);
+}
+
+// ─── Scaffold Frontend UI Components ───────────────────────────────
+// Generates AdminPanel, ProfilePage, AccountMenu, and corral-styles.css
+// Called after auth-context + gates are generated in any framework branch.
+
+async function scaffoldFrontendComponents(
+  srcDir: string,
+  vars: Record<string, string>,
+  results: string[],
+  existingServer?: ExistingServer | null,
+): Promise<void> {
+  const componentsDir = join(srcDir, 'components');
+  mkdirSync(componentsDir, { recursive: true });
+
+  // AdminPanel.tsx
+  const adminPanelPath = join(componentsDir, 'AdminPanel.tsx');
+  if (!existsSync(adminPanelPath)) {
+    writeFileSync(adminPanelPath, replaceVars(loadTemplate('admin-panel.tsx.tmpl'), vars));
+    results.push(adminPanelPath);
+    success(`Created ${adminPanelPath} (admin user management UI)`);
+  }
+
+  // ProfilePage.tsx
+  const profilePagePath = join(componentsDir, 'ProfilePage.tsx');
+  if (!existsSync(profilePagePath)) {
+    writeFileSync(profilePagePath, replaceVars(loadTemplate('profile-page.tsx.tmpl'), vars));
+    results.push(profilePagePath);
+    success(`Created ${profilePagePath} (user profile + billing UI)`);
+  }
+
+  // AccountMenu.tsx
+  const accountMenuPath = join(componentsDir, 'AccountMenu.tsx');
+  if (!existsSync(accountMenuPath)) {
+    writeFileSync(accountMenuPath, replaceVars(loadTemplate('account-menu.tsx.tmpl'), vars));
+    results.push(accountMenuPath);
+    success(`Created ${accountMenuPath} (nav dropdown: profile, upgrade, admin, sign out)`);
+  }
+
+  // corral-styles.css (at src root, not components/)
+  const stylesPath = join(srcDir, 'corral-styles.css');
+  if (!existsSync(stylesPath)) {
+    writeFileSync(stylesPath, replaceVars(loadTemplate('corral-styles.css.tmpl'), vars));
+    results.push(stylesPath);
+    success(`Created ${stylesPath} (Corral UI styles — import in your app)`);
+  }
+
+  // Admin API routes — place into server src/ if existing server found, else skip
+  if (existingServer) {
+    const adminApiPath = join(existingServer.srcDir, 'corral-admin-routes.ts');
+    if (!existsSync(adminApiPath)) {
+      writeFileSync(adminApiPath, replaceVars(loadTemplate('admin-api.ts.tmpl'), vars));
+      results.push(adminApiPath);
+      success(`Created ${adminApiPath} (admin & billing API routes for ${existingServer.framework})`);
+      info(`Mount in your server: app.use('/api/corral', (await import('./corral-admin-routes.js')).default)`);
+    }
+  }
 }
 
 export async function initCommand(opts: { json?: boolean; config: string; db?: string; install?: boolean; server?: 'express' | 'hono' | 'fastify' }) {
