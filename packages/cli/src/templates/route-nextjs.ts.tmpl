@@ -3,10 +3,29 @@
 
 import { auth } from "@/lib/corral";
 import { NextResponse } from "next/server";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
 async function handleAuth(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  
+
+  // Agent discovery — serve generated llms.txt at /api/auth/llms.txt
+  if (url.pathname === "/api/auth/llms.txt") {
+    try {
+      const llmsPath = join(process.cwd(), "public", ".well-known", "llms.txt");
+      if (existsSync(llmsPath)) {
+        const content = readFileSync(llmsPath, "utf-8");
+        return new Response(content, {
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+    } catch { /* fall through */ }
+    return new Response(
+      "# llms.txt\nRun: npx create-corral llms-txt\nFull docs: https://docs.llamafarm.dev/corral/llms.txt\n",
+      { headers: { "Content-Type": "text/plain" } }
+    );
+  }
+
   // LEARNING #20: Better Auth sign-out returns empty body which crashes Next.js.
   // Handle sign-out manually via auth.api + clear cookie with NextResponse.
   if (url.pathname.endsWith("/sign-out") && req.method === "POST") {

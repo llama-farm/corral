@@ -6,6 +6,7 @@ import { parse, stringify } from 'yaml';
 import { Command, type OptionValues } from 'commander';
 import chalk from 'chalk';
 import { success, info, warn, error, jsonOutput } from '../util.js';
+import { writeProjectLlmsTxt } from './serve-llms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -130,13 +131,45 @@ async function addPageCommand(
       try {
         const appName = config?.app?.name || process.cwd().split('/').pop() || 'App';
         const gatesTmpl = loadTemplate('gates.tsx.tmpl');
-        const gatesContent = replaceVars(gatesTmpl, { APP_NAME: appName });
+        let gatesContent = replaceVars(gatesTmpl, { APP_NAME: appName });
+
+        // Build PLAN_RANK dynamically from corral.yaml plans
+        const plans = config.plans || [];
+        const planNames: string[] = plans.map((p: any) =>
+          typeof p === 'string' ? p : (p.name || p.id || ''),
+        ).filter(Boolean);
+        if (planNames.length > 0) {
+          const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
+          const dynamicRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
+          gatesContent = gatesContent.replace(
+            /const PLAN_RANK: Record<string, number> = \{[^}]*\}/,
+            dynamicRank,
+          );
+        }
+
         mkdirSync(dirname(gatesPath), { recursive: true });
         writeFileSync(gatesPath, gatesContent);
         results.push(gatesPath);
         info(`Created ${gatesPath} (PlanGate / AuthGate / BlurGate components)`);
       } catch {
         warn(`Could not auto-create gates.tsx — PlanGate import may need adjustment`);
+      }
+    }
+
+    // Also create auth-context.tsx if missing (gates.tsx imports from ./auth-context)
+    const srcDir2 = existsSync('src') ? 'src' : '.';
+    const authContextPath = join(srcDir2, 'auth-context.tsx');
+    if (!existsSync(authContextPath) && !opts.dryRun) {
+      try {
+        const appName = config?.app?.name || process.cwd().split('/').pop() || 'App';
+        const authTmpl = loadTemplate('auth-context.tsx.tmpl');
+        const authContent = replaceVars(authTmpl, { APP_NAME: appName });
+        mkdirSync(dirname(authContextPath), { recursive: true });
+        writeFileSync(authContextPath, authContent);
+        results.push(authContextPath);
+        info(`Created ${authContextPath} (useAuth hook + AuthProvider)`);
+      } catch {
+        warn(`Could not auto-create auth-context.tsx — useAuth import may need adjustment`);
       }
     }
   }
@@ -250,6 +283,7 @@ async function addFeatureCommand(
 
   if (!opts.dryRun) {
     success(`Added feature "${name}" (plans: ${plans.join(', ')}) to ${opts.config}`);
+    if (existsSync('public/.well-known/llms.txt')) writeProjectLlmsTxt(opts.config);
   }
   if (opts.description) {
     info(`Description: ${opts.description}`);
@@ -355,6 +389,7 @@ async function addMeterCommand(
   if (!opts.dryRun) {
     const limitsStr = Object.entries(newLimits).map(([p, l]) => `${p}: ${l}`).join(', ');
     success(`Updated meter "${meterKey}" (limits: ${limitsStr}/${resetPeriodStr}) in ${opts.config}`);
+    if (existsSync('public/.well-known/llms.txt')) writeProjectLlmsTxt(opts.config);
   }
   info(`Track usage: ${chalk.cyan(`corral.meter.increment('${name}', userId)`)}`);
   info(`Check limit: ${chalk.cyan(`corral.meter.check('${name}', userId)`)}`);
@@ -403,6 +438,7 @@ async function addProviderCommand(
 
   if (!opts.dryRun) {
     success(`Added ${name} provider to ${opts.config}`);
+    if (existsSync('public/.well-known/llms.txt')) writeProjectLlmsTxt(opts.config);
   }
 
   const envVars = PROVIDER_ENV_VARS[name];
@@ -473,6 +509,13 @@ async function addPlanCommand(
     ? opts.features.split(',').map((f: string) => f.trim())
     : [];
 
+  const trialDays = opts.trial ? parseInt(opts.trial, 10) : 0;
+  const cta = trialDays > 0
+    ? 'Start Free Trial'
+    : price > 100
+      ? 'Contact Sales'
+      : 'Get Started';
+
   const newPlan: Record<string, any> = {
     name: planName,
     display_name: planName.charAt(0).toUpperCase() + planName.slice(1),
@@ -480,7 +523,7 @@ async function addPlanCommand(
     interval: price === 0 ? undefined : 'month',
     stripe_price_id: '',
     features: featuresList.length > 0 ? featuresList : [`Everything in the ${planName} plan`],
-    cta: price === 0 ? 'Get Started' : 'Start Free Trial',
+    cta,
   };
 
   if (price === 0) delete newPlan.interval;
@@ -493,6 +536,7 @@ async function addPlanCommand(
 
   if (!opts.dryRun) {
     success(`Added plan "${planName}" ($${price}/mo) to ${opts.config}`);
+    if (existsSync('public/.well-known/llms.txt')) writeProjectLlmsTxt(opts.config);
   }
   if (opts.trial) info(`Trial: ${opts.trial} days`);
   if (featuresList.length > 0) info(`Features: ${featuresList.join(', ')}`);

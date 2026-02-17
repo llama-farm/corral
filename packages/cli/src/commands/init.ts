@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import { randomBytes } from 'crypto';
 import chalk from 'chalk';
 import { success, info, warn, jsonOutput } from '../util.js';
+import { writeProjectLlmsTxt } from './serve-llms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -291,6 +292,84 @@ function checkViteProxy(framework: Framework): boolean {
     }
   }
   return false;
+}
+
+// ─── Agent Discovery Breadcrumbs ──────────────────────────────────────────────
+
+const AGENTS_MD_SECTION = `
+## Auth & Billing (Corral)
+
+This project uses [Corral](https://docs.llamafarm.dev/corral/) for authentication and billing.
+
+- Config: \`corral.yaml\` — edit plans, features, meters here
+- Agent guide: \`CORRAL.md\` — project-specific auth details
+- Full docs: https://docs.llamafarm.dev/corral/llms.txt
+
+### Quick Commands
+\`\`\`bash
+npx create-corral add feature <name> --plan <plan>  # gate a feature
+npx create-corral add plan <name> --price <n>       # add a plan
+npx create-corral add provider <name>               # add OAuth
+npx create-corral doctor                            # verify setup
+\`\`\`
+`;
+
+const CURSOR_RULES_SECTION = `
+# Auth & Billing
+This project uses Corral for auth. Read CORRAL.md for setup details.
+For Corral commands: https://docs.llamafarm.dev/corral/llms.txt
+`;
+
+function injectAgentBreadcrumbs(configPath: string): void {
+  // a. AGENTS.md
+  if (existsSync('AGENTS.md')) {
+    const content = readFileSync('AGENTS.md', 'utf-8');
+    if (!content.includes('## Auth (Corral)') && !content.includes('## Auth & Billing (Corral)')) {
+      appendFileSync('AGENTS.md', AGENTS_MD_SECTION);
+      success('Updated AGENTS.md with Corral section');
+    }
+  }
+
+  // b. .cursorrules
+  if (existsSync('.cursorrules')) {
+    const content = readFileSync('.cursorrules', 'utf-8');
+    if (!content.includes('Corral for auth')) {
+      appendFileSync('.cursorrules', CURSOR_RULES_SECTION);
+      success('Updated .cursorrules with Corral context');
+    }
+  }
+
+  // c. .github/copilot-instructions.md
+  const copilotPath = '.github/copilot-instructions.md';
+  if (existsSync(copilotPath)) {
+    const content = readFileSync(copilotPath, 'utf-8');
+    if (!content.includes('Corral for auth')) {
+      appendFileSync(copilotPath, CURSOR_RULES_SECTION);
+      success('Updated .github/copilot-instructions.md with Corral context');
+    }
+  }
+
+  // d. package.json — add corral metadata
+  const pkgPath = 'package.json';
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      if (!pkg.corral) {
+        pkg.corral = {
+          version: '0.1.1',
+          llms: 'https://docs.llamafarm.dev/corral/llms.txt',
+          config: configPath,
+        };
+        writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+        success('Added corral metadata to package.json');
+      }
+    } catch {
+      // non-fatal
+    }
+  }
+
+  // e. public/.well-known/llms.txt (Next.js static file)
+  writeProjectLlmsTxt(configPath);
 }
 
 export async function initCommand(opts: { json?: boolean; config: string; db?: string; install?: boolean; server?: 'express' | 'hono' | 'fastify' }) {
@@ -634,6 +713,50 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
       success(`Created ${setupPath} (${db})`);
     }
 
+    // Generate auth-context.tsx + gates.tsx for Next.js (at src/ or root)
+    const nextSrcDir = existsSync('src') ? 'src' : '.';
+    const nextAuthContextPath = join(nextSrcDir, 'auth-context.tsx');
+    if (!existsSync(nextAuthContextPath)) {
+      mkdirSync(dirname(nextAuthContextPath), { recursive: true });
+      writeFileSync(nextAuthContextPath, replaceVars(loadTemplate('auth-context.tsx.tmpl'), vars));
+      results.push(nextAuthContextPath);
+      success(`Created ${nextAuthContextPath} (useAuth hook + AuthProvider)`);
+    }
+
+    const nextGatesPath = join(nextSrcDir, 'gates.tsx');
+    if (!existsSync(nextGatesPath)) {
+      mkdirSync(dirname(nextGatesPath), { recursive: true });
+      writeFileSync(nextGatesPath, replaceVars(loadTemplate('gates.tsx.tmpl'), vars));
+      results.push(nextGatesPath);
+      success(`Created ${nextGatesPath} (AuthGate, PlanGate, BlurGate components)`);
+    }
+
+    // Wrap {children} in AuthProvider in app/layout.tsx
+    const layoutPath = 'app/layout.tsx';
+    if (existsSync(layoutPath)) {
+      let layoutContent = readFileSync(layoutPath, 'utf-8');
+      if (!layoutContent.includes('AuthProvider')) {
+        // Add import at the top (after last existing import or at the very top)
+        const importLine = `import { AuthProvider } from '@/auth-context';\n`;
+        const lastImportIdx = layoutContent.lastIndexOf('\nimport ');
+        if (lastImportIdx !== -1) {
+          const insertAt = layoutContent.indexOf('\n', lastImportIdx + 1) + 1;
+          layoutContent = layoutContent.slice(0, insertAt) + importLine + layoutContent.slice(insertAt);
+        } else {
+          layoutContent = importLine + layoutContent;
+        }
+        // Wrap {children} with <AuthProvider>
+        layoutContent = layoutContent.replace(
+          /\{children\}/g,
+          '<AuthProvider>{children}</AuthProvider>',
+        );
+        writeFileSync(layoutPath, layoutContent);
+        success(`Patched ${layoutPath} — wrapped {children} with <AuthProvider>`);
+      } else {
+        info(`${layoutPath} already has AuthProvider — skipping`);
+      }
+    }
+
   } else if (framework.name === 'hono') {
     // ─── Hono: route handler ─────────────────────────────────────────
     const routePath = 'src/auth.ts';
@@ -761,6 +884,16 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
       }
     }
   }
+
+  // Step 9: Agent discovery breadcrumbs
+  injectAgentBreadcrumbs(opts.config);
+
+  // Breadcrumb summary
+  console.log('');
+  console.log(chalk.bold('📖 Agent discovery:'));
+  console.log(`   ${chalk.cyan('•')} CORRAL.md — project-specific guide (share with your agent)`);
+  console.log(`   ${chalk.cyan('•')} corral.yaml — edit plans, features, auth here`);
+  console.log(`   ${chalk.cyan('•')} llms.txt — https://docs.llamafarm.dev/corral/llms.txt`);
 
   // JSON output for agents
   if (jsonOutput({
