@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deployment — Corral Docs</title>
+  <meta name="description" content="Deploy Corral with Docker, Railway, Fly.io, Vercel, or Docker Compose. Covers single-container, multi-language, and PaaS deployments. The 'nobody sees Node' principle explained.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="main-nav">
+  <div class="nav-left">
+    <a href="index.html" class="nav-logo"><span class="logo-emoji">🦙</span> Corral</a>
+  </div>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+    <a href="deployment.html" class="active">Deploy</a>
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+</nav>
+<script>
+document.querySelector('.nav-toggle').addEventListener('click',function(){document.querySelector('.nav-links').classList.toggle('open');});
+</script>
+
+<div class="docs-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Deployment</div>
+      <ul class="sidebar-nav">
+        <li><a href="#the-principle" class="active">The Principle</a></li>
+        <li><a href="#docker">Docker</a></li>
+        <li><a href="#railway">Railway</a></li>
+        <li><a href="#fly-io">Fly.io</a></li>
+        <li><a href="#vercel">Vercel</a></li>
+        <li><a href="#docker-compose">Docker Compose</a></li>
+        <li><a href="#multi-language">Multi-Language</a></li>
+        <li><a href="#env-vars">Env Vars Reference</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="cli.html">CLI Reference</a></li>
+        <li><a href="api.html">API Reference</a></li>
+        <li><a href="frameworks.html">Framework Guides</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Getting Started</div>
+      <ul class="sidebar-nav">
+        <li><a href="quickstart.html">Quickstart</a></li>
+        <li><a href="concepts.html">Core Concepts</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Resources</div>
+      <ul class="sidebar-nav">
+        <li><a href="llms.txt">llms.txt</a></li>
+        <li><a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub ↗</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="docs-content">
+    <h1>Deployment</h1>
+    <p class="docs-lead">
+      Deploy Corral with any stack — Docker, Railway, Fly.io, Vercel, or bare VMs.
+      The auth server runs as a lightweight sidecar: internal only, never exposed to the internet.
+    </p>
+
+    <!-- ── The Principle ───────────────────────────────────────── -->
+    <h2 id="the-principle">The "Nobody Sees Node" Principle</h2>
+    <p>
+      Corral's auth server is a small Node.js process (~40 lines of Express) that
+      runs <em>internally</em> on port <code>3456</code>. Your backend is the only
+      thing that talks to it. The outside world only sees your backend.
+    </p>
+
+    <div class="how-box" style="max-width:500px;margin:20px 0">
+      <pre style="font-family:var(--font-mono);font-size:0.85rem;color:#c9d1d9;line-height:1.8"><span style="color:#86efac">Internet</span>
+  │
+  ▼
+<span style="color:#f59e0b">:8000</span>  Your backend  (exposed)
+  │
+  ▼ AUTH_URL=http://localhost:3456
+<span style="color:#555">:3456</span>  Corral auth   (internal only)</pre>
+    </div>
+
+    <p>
+      This means: no extra domain, no separate auth service, no CORS wrangling.
+      Your backend validates sessions by calling <code>http://localhost:3456/api/auth/validate</code>.
+      Python, Go, Rust, Ruby — it doesn't matter. One HTTP call.
+    </p>
+
+    <div class="callout tip">
+      <div class="callout-title">For Next.js / Node-only apps</div>
+      If your entire app is Node.js (Next.js, Express, Hono, Fastify), Corral mounts
+      directly as route handlers — no sidecar needed. The supervisord pattern is for
+      non-Node backends that need Corral's auth alongside them.
+    </div>
+
+    <!-- ── Docker ──────────────────────────────────────────────── -->
+    <h2 id="docker">Docker</h2>
+    <p>
+      The single-container pattern runs both processes (auth + backend) via
+      <code>supervisord</code>. Only the backend port is exposed.
+      <code>tini</code> handles PID 1 signal forwarding correctly.
+    </p>
+
+    <h3 id="dockerfile">Dockerfile</h3>
+    <p>
+      Run <code>corral init --docker</code> to generate this — or use it as a starting point.
+      The template uses build args to switch between Python, Go, Rust, and Ruby backends.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">Dockerfile</span>
+        <span class="code-lang">dockerfile</span>
+      </div>
+      <pre><code><span class="tok-comment"># ============================================================
+# Corral Auth + Your Backend — Single Container
+# Auth server on :3456 (internal). Backend on :8000 (exposed).
+# ============================================================</span>
+
+<span class="tok-keyword">FROM</span> node:22-slim <span class="tok-key">AS</span> base
+
+<span class="tok-keyword">RUN</span> apt-get update &amp;&amp; apt-get install -y --no-install-recommends \
+    supervisor curl tini \
+    &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+<span class="tok-comment"># ── Stage 2: Corral auth server (Node) ──────────────────────</span>
+<span class="tok-keyword">COPY</span> server/package*.json server/
+<span class="tok-keyword">RUN</span> cd server &amp;&amp; npm ci --omit=dev
+<span class="tok-keyword">COPY</span> server/ server/
+
+<span class="tok-comment"># ── Stage 3: Your backend ───────────────────────────────────</span>
+<span class="tok-comment"># Python example — replace with Go/Rust/Ruby as needed</span>
+<span class="tok-keyword">COPY</span> requirements.txt .
+<span class="tok-keyword">RUN</span> python3 -m venv /app/venv \
+    &amp;&amp; /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+<span class="tok-keyword">COPY</span> app/ app/
+
+<span class="tok-comment"># ── Stage 4: Runtime config ─────────────────────────────────</span>
+<span class="tok-keyword">RUN</span> mkdir -p /app/data
+<span class="tok-keyword">COPY</span> supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+<span class="tok-comment"># Non-root user</span>
+<span class="tok-keyword">RUN</span> groupadd -r corral &amp;&amp; useradd -r -g corral -d /app corral \
+    &amp;&amp; chown -R corral:corral /app
+<span class="tok-keyword">USER</span> corral
+
+<span class="tok-keyword">ENV</span> AUTH_PORT=3456 \
+    AUTH_URL=http://localhost:3456 \
+    PORT=8000 \
+    CORRAL_DB_PATH=/app/data/corral.db \
+    NODE_ENV=production
+
+<span class="tok-comment"># Only expose the backend — auth stays internal</span>
+<span class="tok-keyword">EXPOSE</span> 8000
+
+<span class="tok-keyword">ENTRYPOINT</span> ["tini", "--"]
+<span class="tok-keyword">CMD</span> ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+<span class="tok-keyword">HEALTHCHECK</span> --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1</code></pre>
+    </div>
+
+    <h3 id="supervisord-conf">supervisord.conf</h3>
+    <p>
+      Two processes, one container. Both auto-restart on failure.
+      Logs stream to stdout/stderr for <code>docker logs</code> compatibility.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">supervisord.conf</span>
+        <span class="code-lang">ini</span>
+      </div>
+      <pre><code><span class="tok-comment">; Two processes, one container. Auth on :3456 (internal), backend on :8000.</span>
+
+[supervisord]
+nodaemon=true
+user=corral
+logfile=/dev/null
+logfile_maxbytes=0
+pidfile=/tmp/supervisord.pid
+
+<span class="tok-comment">; ── Corral Auth Server (Node.js) ─────────────────────────────</span>
+[program:auth]
+command=node /app/server/auth.js
+directory=/app/server
+environment=PORT="3456",AUTH_PORT="3456",CORRAL_DB_PATH="/app/data/corral.db"
+autorestart=true
+startretries=5
+startsecs=3
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+priority=10
+
+<span class="tok-comment">; ── Backend (Python example) ─────────────────────────────────</span>
+[program:backend]
+command=/app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+directory=/app
+environment=PORT="8000",AUTH_URL="http://localhost:3456",CORRAL_DB_PATH="/app/data/corral.db"
+autorestart=true
+startretries=5
+startsecs=3
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+priority=20</code></pre>
+    </div>
+
+    <h3 id="docker-build-run">Build and run</h3>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">Docker</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">docker build -t myapp .</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">docker run \
+  -p 8000:8000 \
+  -v corral_data:/app/data \
+  --env-file .env \
+  myapp</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output"># Test the health endpoint</span>
+        <span class="terminal-line cmd">curl http://localhost:8000/health</span>
+        <span class="terminal-line success">{"status":"ok","auth":"connected"}</span>
+      </div>
+    </div>
+
+    <h3 id="docker-env-vars">Environment variables for Docker</h3>
+    <p>Create a <code>.env</code> file (never commit this):</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">.env</span>
+        <span class="code-lang">bash</span>
+      </div>
+      <pre><code><span class="tok-comment"># Required</span>
+<span class="tok-key">BETTER_AUTH_SECRET</span>=<span class="tok-string">your-32-char-random-string-here</span>
+<span class="tok-key">DATABASE_URL</span>=<span class="tok-string">postgresql://user:pass@host:5432/db</span>
+
+<span class="tok-comment"># Stripe (required for billing)</span>
+<span class="tok-key">STRIPE_SECRET_KEY</span>=<span class="tok-string">sk_live_...</span>
+<span class="tok-key">STRIPE_PUBLISHABLE_KEY</span>=<span class="tok-string">pk_live_...</span>
+<span class="tok-key">STRIPE_WEBHOOK_SECRET</span>=<span class="tok-string">whsec_...</span>
+
+<span class="tok-comment"># Social auth (optional)</span>
+<span class="tok-key">GOOGLE_CLIENT_ID</span>=<span class="tok-string">...</span>
+<span class="tok-key">GOOGLE_CLIENT_SECRET</span>=<span class="tok-string">...</span>
+<span class="tok-key">GITHUB_CLIENT_ID</span>=<span class="tok-string">...</span>
+<span class="tok-key">GITHUB_CLIENT_SECRET</span>=<span class="tok-string">...</span>
+
+<span class="tok-comment"># Internal (set automatically by Dockerfile defaults)</span>
+<span class="tok-key">AUTH_PORT</span>=<span class="tok-string">3456</span>
+<span class="tok-key">AUTH_URL</span>=<span class="tok-string">http://localhost:3456</span>
+<span class="tok-key">PORT</span>=<span class="tok-string">8000</span>
+<span class="tok-key">CORRAL_DB_PATH</span>=<span class="tok-string">/app/data/corral.db</span></code></pre>
+    </div>
+
+    <!-- ── Railway ─────────────────────────────────────────────── -->
+    <h2 id="railway">Railway</h2>
+    <p>
+      Railway builds from your Dockerfile automatically. Push your repo and Railway
+      detects the <code>railway.json</code> config. SQLite works on Railway with a
+      persistent volume — or swap in PostgreSQL from the Railway dashboard.
+    </p>
+
+    <h3 id="railway-json">railway.json</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">railway.json</span>
+        <span class="code-lang">json</span>
+      </div>
+      <pre><code>{
+  <span class="tok-key">"$schema"</span>: <span class="tok-string">"https://railway.app/railway.schema.json"</span>,
+  <span class="tok-key">"build"</span>: {
+    <span class="tok-key">"builder"</span>: <span class="tok-string">"DOCKERFILE"</span>,
+    <span class="tok-key">"dockerfilePath"</span>: <span class="tok-string">"Dockerfile"</span>
+  },
+  <span class="tok-key">"deploy"</span>: {
+    <span class="tok-key">"startCommand"</span>: <span class="tok-string">"supervisord -c /etc/supervisor/conf.d/supervisord.conf"</span>,
+    <span class="tok-key">"healthcheckPath"</span>: <span class="tok-string">"/health"</span>,
+    <span class="tok-key">"healthcheckTimeout"</span>: <span class="tok-number">5</span>,
+    <span class="tok-key">"restartPolicyType"</span>: <span class="tok-string">"ON_FAILURE"</span>,
+    <span class="tok-key">"restartPolicyMaxRetries"</span>: <span class="tok-number">3</span>
+  },
+  <span class="tok-key">"environments"</span>: {
+    <span class="tok-key">"production"</span>: {
+      <span class="tok-key">"variables"</span>: {
+        <span class="tok-key">"AUTH_PORT"</span>: <span class="tok-string">"3456"</span>,
+        <span class="tok-key">"AUTH_URL"</span>: <span class="tok-string">"http://localhost:3456"</span>,
+        <span class="tok-key">"CORRAL_DB_PATH"</span>: <span class="tok-string">"/app/data/corral.db"</span>
+      }
+    }
+  }
+}</code></pre>
+    </div>
+
+    <h3 id="railway-deploy">Deploy to Railway</h3>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">Railway</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">railway login</span>
+        <span class="terminal-line cmd">railway init</span>
+        <span class="terminal-line cmd">railway up</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Deployed to https://myapp-production.up.railway.app</span>
+      </div>
+    </div>
+
+    <h3 id="railway-env">Environment variables in Railway dashboard</h3>
+    <p>
+      Go to your service → <strong>Variables</strong> tab. Add these:
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td><code>BETTER_AUTH_SECRET</code></td><td>Generate with <code>openssl rand -base64 32</code></td></tr>
+          <tr><td><code>STRIPE_SECRET_KEY</code></td><td>Your Stripe live/test secret key</td></tr>
+          <tr><td><code>STRIPE_WEBHOOK_SECRET</code></td><td>From Stripe webhook dashboard</td></tr>
+          <tr><td><code>DATABASE_URL</code></td><td>Railway PostgreSQL plugin provides this automatically</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>From Google Cloud Console</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td>From Google Cloud Console</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-title">PostgreSQL on Railway</div>
+      Add a PostgreSQL plugin from the Railway dashboard. It auto-injects
+      <code>DATABASE_URL</code> into your service. Corral will use it automatically
+      when you set <code>database.adapter: postgres</code> in <code>corral.yaml</code>.
+    </div>
+
+    <!-- ── Fly.io ───────────────────────────────────────────────── -->
+    <h2 id="fly-io">Fly.io</h2>
+    <p>
+      Fly.io is ideal for Corral: persistent volumes for SQLite, global edge deployment,
+      and first-class Docker support. Use <code>fly launch</code> to get started —
+      it detects your Dockerfile automatically.
+    </p>
+
+    <h3 id="fly-toml">fly.toml</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">fly.toml</span>
+        <span class="code-lang">toml</span>
+      </div>
+      <pre><code><span class="tok-comment"># Fly.io config — single container, auth on :3456 (internal)</span>
+app = <span class="tok-string">"your-app-name"</span>
+primary_region = <span class="tok-string">"iad"</span>
+
+[build]
+  dockerfile = <span class="tok-string">"Dockerfile"</span>
+
+[env]
+  AUTH_PORT = <span class="tok-string">"3456"</span>
+  AUTH_URL = <span class="tok-string">"http://localhost:3456"</span>
+  PORT = <span class="tok-string">"8000"</span>
+  CORRAL_DB_PATH = <span class="tok-string">"/app/data/corral.db"</span>
+
+[http_service]
+  internal_port = <span class="tok-number">8000</span>
+  force_https = <span class="tok-keyword">true</span>
+  auto_stop_machines = <span class="tok-keyword">true</span>
+  auto_start_machines = <span class="tok-keyword">true</span>
+  min_machines_running = <span class="tok-number">0</span>
+
+  [http_service.concurrency]
+    type = <span class="tok-string">"connections"</span>
+    hard_limit = <span class="tok-number">250</span>
+    soft_limit = <span class="tok-number">200</span>
+
+[[http_service.checks]]
+  grace_period = <span class="tok-string">"10s"</span>
+  interval = <span class="tok-string">"30s"</span>
+  method = <span class="tok-string">"GET"</span>
+  path = <span class="tok-string">"/health"</span>
+  timeout = <span class="tok-string">"5s"</span>
+
+<span class="tok-comment"># Persistent volume for SQLite</span>
+[mounts]
+  source = <span class="tok-string">"corral_data"</span>
+  destination = <span class="tok-string">"/app/data"</span></code></pre>
+    </div>
+
+    <h3 id="fly-deploy">Deploy to Fly.io</h3>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">Fly.io</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">fly launch</span>
+        <span class="terminal-line info">Detected Dockerfile. Using existing fly.toml…</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output"># Create a volume for SQLite persistence</span>
+        <span class="terminal-line cmd">fly volumes create corral_data --size 1</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output"># Set secrets (encrypted at rest)</span>
+        <span class="terminal-line cmd">fly secrets set BETTER_AUTH_SECRET=$(openssl rand -base64 32)</span>
+        <span class="terminal-line cmd">fly secrets set STRIPE_SECRET_KEY=sk_live_...</span>
+        <span class="terminal-line cmd">fly secrets set STRIPE_WEBHOOK_SECRET=whsec_...</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">fly deploy</span>
+        <span class="terminal-line success">Deployed to https://your-app-name.fly.dev</span>
+      </div>
+    </div>
+
+    <h3 id="fly-secrets">Secrets management</h3>
+    <p>
+      Fly.io secrets are encrypted and injected as environment variables at runtime.
+      Use <code>fly secrets set KEY=value</code> for sensitive values — never put
+      them in <code>fly.toml</code>.
+    </p>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">Fly.io secrets</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">fly secrets set \
+  BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+  STRIPE_SECRET_KEY="sk_live_..." \
+  STRIPE_PUBLISHABLE_KEY="pk_live_..." \
+  STRIPE_WEBHOOK_SECRET="whsec_..." \
+  GOOGLE_CLIENT_ID="..." \
+  GOOGLE_CLIENT_SECRET="..."</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">fly secrets list</span>
+        <span class="terminal-line output">NAME                      DIGEST    CREATED AT</span>
+        <span class="terminal-line output">BETTER_AUTH_SECRET        abc123    2024-01-01</span>
+        <span class="terminal-line output">STRIPE_SECRET_KEY         def456    2024-01-01</span>
+      </div>
+    </div>
+
+    <!-- ── Vercel ────────────────────────────────────────────────── -->
+    <h2 id="vercel">Vercel</h2>
+    <p>
+      For Next.js apps, Corral deploys on Vercel without any special config —
+      auth lives in API routes which Vercel handles natively.
+    </p>
+
+    <div class="callout warn">
+      <div class="callout-title">SQLite on Vercel</div>
+      Vercel's serverless functions have no persistent filesystem. SQLite
+      (<code>corral.db</code>) will <strong>not work</strong> on Vercel serverless.
+      Use <a href="https://turso.tech" target="_blank" rel="noopener">Turso</a> (libSQL)
+      or PostgreSQL instead. Set <code>database.adapter: turso</code> or
+      <code>database.adapter: postgres</code> in <code>corral.yaml</code>.
+    </div>
+
+    <h3 id="vercel-nextjs">Next.js on Vercel</h3>
+    <p>
+      Corral mounts its auth routes at <code>/api/auth/[...corral]</code> — standard
+      Next.js API routes. Vercel deploys them as serverless functions automatically.
+      No extra configuration needed.
+    </p>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">Vercel</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">vercel</span>
+        <span class="terminal-line info">Detected Next.js app. Deploying…</span>
+        <span class="terminal-line success">Deployed to https://myapp.vercel.app</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output"># Auth routes are serverless functions:</span>
+        <span class="terminal-line info">  https://myapp.vercel.app/api/auth/signin</span>
+        <span class="terminal-line info">  https://myapp.vercel.app/api/auth/session</span>
+        <span class="terminal-line info">  https://myapp.vercel.app/api/billing/checkout</span>
+      </div>
+    </div>
+
+    <h3 id="vercel-env">Environment variables in Vercel dashboard</h3>
+    <p>
+      Go to your project → <strong>Settings</strong> → <strong>Environment Variables</strong>.
+      Add these for Production (and optionally Preview):
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>BETTER_AUTH_SECRET</code></td><td>32+ char secret. Must match across all deployments.</td></tr>
+          <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL or Turso URL (not SQLite)</td></tr>
+          <tr><td><code>STRIPE_SECRET_KEY</code></td><td>Use <code>sk_test_</code> for Preview, <code>sk_live_</code> for Production</td></tr>
+          <tr><td><code>STRIPE_PUBLISHABLE_KEY</code></td><td>Used client-side in checkout</td></tr>
+          <tr><td><code>STRIPE_WEBHOOK_SECRET</code></td><td>From Stripe → Webhooks. Set up a separate webhook endpoint for each environment.</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>Optional — only if using Google OAuth</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td>Optional</td></tr>
+          <tr><td><code>NEXTAUTH_URL</code></td><td>Set to your deployment URL for OAuth redirect handling</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="vercel-turso">Using Turso with Vercel</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">corral.yaml</span>
+        <span class="code-lang">yaml</span>
+      </div>
+      <pre><code><span class="tok-key">database</span>:
+  <span class="tok-key">adapter</span>: <span class="tok-string">turso</span>
+  <span class="tok-key">url</span>: <span class="tok-string">env:TURSO_DATABASE_URL</span>
+  <span class="tok-key">auth_token</span>: <span class="tok-string">env:TURSO_AUTH_TOKEN</span></code></pre>
+    </div>
+
+    <!-- ── Docker Compose ──────────────────────────────────────── -->
+    <h2 id="docker-compose">Docker Compose (Local Dev)</h2>
+    <p>
+      For local development, Docker Compose mounts your source as volumes so
+      changes are picked up without rebuilding. SQLite persists in a named volume.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">docker-compose.yml</span>
+        <span class="code-lang">yaml</span>
+      </div>
+      <pre><code><span class="tok-comment"># Local dev with hot reload. Auth on :3456 (internal), backend on :8000.</span>
+<span class="tok-key">services</span>:
+  <span class="tok-key">app</span>:
+    <span class="tok-key">build</span>:
+      <span class="tok-key">context</span>: <span class="tok-string">.</span>
+      <span class="tok-key">dockerfile</span>: <span class="tok-string">Dockerfile</span>
+    <span class="tok-key">ports</span>:
+      - <span class="tok-string">"${PORT:-8000}:8000"</span>
+    <span class="tok-key">env_file</span>:
+      - <span class="tok-string">.env</span>
+    <span class="tok-key">environment</span>:
+      - <span class="tok-string">AUTH_PORT=3456</span>
+      - <span class="tok-string">AUTH_URL=http://localhost:3456</span>
+      - <span class="tok-string">PORT=8000</span>
+      - <span class="tok-string">CORRAL_DB_PATH=/app/data/corral.db</span>
+    <span class="tok-key">volumes</span>:
+      <span class="tok-comment"># Hot-reload: mount source code</span>
+      - <span class="tok-string">./server:/app/server</span>
+      - <span class="tok-string">./app:/app/app</span>
+      <span class="tok-comment"># Persistent SQLite data</span>
+      - <span class="tok-string">corral_data:/app/data</span>
+      <span class="tok-comment"># Avoid overwriting node_modules</span>
+      - <span class="tok-string">/app/server/node_modules</span>
+    <span class="tok-key">restart</span>: <span class="tok-string">unless-stopped</span>
+    <span class="tok-key">healthcheck</span>:
+      <span class="tok-key">test</span>: [<span class="tok-string">"CMD"</span>, <span class="tok-string">"curl"</span>, <span class="tok-string">"-f"</span>, <span class="tok-string">"http://localhost:8000/health"</span>]
+      <span class="tok-key">interval</span>: <span class="tok-string">30s</span>
+      <span class="tok-key">timeout</span>: <span class="tok-string">5s</span>
+      <span class="tok-key">retries</span>: <span class="tok-number">3</span>
+      <span class="tok-key">start_period</span>: <span class="tok-string">10s</span>
+
+<span class="tok-key">volumes</span>:
+  <span class="tok-key">corral_data</span>:</code></pre>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">Docker Compose dev</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">docker compose up</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">app-1  | 🦙 Corral auth server listening on :3456</span>
+        <span class="terminal-line success">app-1  | 🚀 Backend listening on :8000</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output"># Edit your source code — changes auto-reload</span>
+        <span class="terminal-line output"># SQLite data persists in the corral_data volume</span>
+      </div>
+    </div>
+
+    <!-- ── Multi-language ──────────────────────────────────────── -->
+    <h2 id="multi-language">Multi-Language Deployments</h2>
+    <p>
+      Corral's auth server is language-agnostic. Your backend validates sessions
+      by calling <code>http://localhost:3456/api/auth/validate</code>.
+      The pattern is the same regardless of your backend language.
+    </p>
+
+    <h3 id="python-sidecar">Python + Node auth sidecar</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">supervisord.conf (Python)</span>
+        <span class="code-lang">ini</span>
+      </div>
+      <pre><code>[program:auth]
+command=node /app/server/auth.js
+environment=PORT="3456",CORRAL_DB_PATH="/app/data/corral.db"
+autorestart=true
+priority=10
+
+[program:backend]
+command=/app/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+environment=PORT="8000",<span class="tok-key">AUTH_URL</span>=<span class="tok-string">"http://localhost:3456"</span>
+autorestart=true
+priority=20</code></pre>
+    </div>
+
+    <p>Validate sessions from your FastAPI backend:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">app/auth.py</span>
+        <span class="code-lang">python</span>
+      </div>
+      <pre><code><span class="tok-keyword">import</span> os, httpx
+<span class="tok-keyword">from</span> fastapi <span class="tok-keyword">import</span> HTTPException, Cookie
+
+AUTH_URL = os.getenv(<span class="tok-string">"AUTH_URL"</span>, <span class="tok-string">"http://localhost:3456"</span>)
+
+<span class="tok-keyword">async def</span> <span class="tok-cmd">get_session</span>(session_token: str = Cookie(None)):
+    <span class="tok-keyword">if not</span> session_token:
+        <span class="tok-keyword">raise</span> HTTPException(status_code=<span class="tok-number">401</span>)
+    <span class="tok-keyword">async with</span> httpx.AsyncClient() <span class="tok-keyword">as</span> client:
+        r = <span class="tok-keyword">await</span> client.get(
+            f<span class="tok-string">"{AUTH_URL}/api/auth/validate"</span>,
+            headers={<span class="tok-string">"Cookie"</span>: f<span class="tok-string">"session={session_token}"</span>}
+        )
+    <span class="tok-keyword">if</span> r.status_code != <span class="tok-number">200</span>:
+        <span class="tok-keyword">raise</span> HTTPException(status_code=<span class="tok-number">401</span>)
+    <span class="tok-keyword">return</span> r.json()  <span class="tok-comment"># { user, plan, features }</span></code></pre>
+    </div>
+
+    <h3 id="go-sidecar">Go + Node auth sidecar</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">auth/validate.go</span>
+        <span class="code-lang">go</span>
+      </div>
+      <pre><code><span class="tok-keyword">package</span> auth
+
+<span class="tok-keyword">import</span> (
+    <span class="tok-string">"encoding/json"</span>
+    <span class="tok-string">"fmt"</span>
+    <span class="tok-string">"net/http"</span>
+    <span class="tok-string">"os"</span>
+)
+
+<span class="tok-keyword">var</span> AuthURL = os.Getenv(<span class="tok-string">"AUTH_URL"</span>) <span class="tok-comment">// http://localhost:3456</span>
+
+<span class="tok-keyword">type</span> Session <span class="tok-keyword">struct</span> {
+    User     map[<span class="tok-keyword">string</span>]<span class="tok-keyword">interface</span>{}
+    Plan     <span class="tok-keyword">string</span>
+    Features []<span class="tok-keyword">string</span>
+}
+
+<span class="tok-keyword">func</span> <span class="tok-cmd">ValidateSession</span>(cookie <span class="tok-keyword">string</span>) (*Session, error) {
+    req, _ := http.NewRequest(<span class="tok-string">"GET"</span>,
+        fmt.Sprintf(<span class="tok-string">"%s/api/auth/validate"</span>, AuthURL), nil)
+    req.Header.Set(<span class="tok-string">"Cookie"</span>, <span class="tok-string">"session="</span>+cookie)
+
+    resp, err := http.DefaultClient.Do(req)
+    <span class="tok-keyword">if</span> err != nil || resp.StatusCode != http.StatusOK {
+        <span class="tok-keyword">return</span> nil, fmt.Errorf(<span class="tok-string">"unauthorized"</span>)
+    }
+    <span class="tok-keyword">var</span> session Session
+    json.NewDecoder(resp.Body).Decode(&amp;session)
+    <span class="tok-keyword">return</span> &amp;session, nil
+}</code></pre>
+    </div>
+
+    <h3 id="nobody-sees-node">The "nobody sees Node" principle</h3>
+    <p>
+      The Node auth server is implementation detail, not infrastructure.
+      Your users, your API clients, and your monitoring tools only ever talk
+      to your backend. The Node process could be replaced tomorrow with a
+      different auth implementation — your backend code doesn't change.
+    </p>
+
+    <div class="how-box" style="margin:20px 0">
+      <div class="how-box-title">Architecture</div>
+      <div style="font-family:var(--font-mono);font-size:0.8rem;line-height:1.9;color:var(--text-muted)">
+        <div><span style="color:#86efac">✓</span> Users hit <code>yourdomain.com</code> → your backend (port 8000)</div>
+        <div><span style="color:#86efac">✓</span> Backend calls <code>localhost:3456</code> → Corral auth (internal)</div>
+        <div><span style="color:#555">✗</span> Nobody else talks to port 3456 — it's not exposed</div>
+        <div><span style="color:#555">✗</span> No "auth service" in your API gateway — no extra routes</div>
+        <div><span style="color:#555">✗</span> No CORS headers needed for auth — same-process call</div>
+      </div>
+    </div>
+
+    <!-- ── Environment Variables ────────────────────────────────── -->
+    <h2 id="env-vars">Environment Variables Reference</h2>
+    <p>
+      Complete reference for all environment variables Corral uses.
+      Variables marked <span class="badge badge-red">Required</span> must be set in production.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Required</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>BETTER_AUTH_SECRET</code></td>
+            <td><span class="badge badge-red">Required</span></td>
+            <td>—</td>
+            <td>32+ char random string. Signs sessions and tokens. Never share or rotate without invalidating all sessions.</td>
+          </tr>
+          <tr>
+            <td><code>DATABASE_URL</code></td>
+            <td><span class="badge badge-gold">Billing</span></td>
+            <td><code>CORRAL_DB_PATH</code></td>
+            <td>PostgreSQL/MySQL connection string. Used when <code>adapter: postgres</code> or <code>adapter: mysql</code> in corral.yaml. Falls back to SQLite if not set.</td>
+          </tr>
+          <tr>
+            <td><code>CORRAL_DB_PATH</code></td>
+            <td><span class="badge badge-gray">Optional</span></td>
+            <td><code>./corral.db</code></td>
+            <td>SQLite file path. Set to a volume mount path for persistence (e.g., <code>/app/data/corral.db</code>).</td>
+          </tr>
+          <tr>
+            <td><code>STRIPE_SECRET_KEY</code></td>
+            <td><span class="badge badge-gold">Billing</span></td>
+            <td>—</td>
+            <td>Stripe secret key (<code>sk_live_...</code> or <code>sk_test_...</code>). Used server-side only.</td>
+          </tr>
+          <tr>
+            <td><code>STRIPE_PUBLISHABLE_KEY</code></td>
+            <td><span class="badge badge-gold">Billing</span></td>
+            <td>—</td>
+            <td>Stripe publishable key (<code>pk_live_...</code>). Safe to expose client-side. Used in checkout.</td>
+          </tr>
+          <tr>
+            <td><code>STRIPE_WEBHOOK_SECRET</code></td>
+            <td><span class="badge badge-gold">Billing</span></td>
+            <td>—</td>
+            <td>Webhook signing secret from Stripe dashboard. Used to verify webhook authenticity.</td>
+          </tr>
+          <tr>
+            <td><code>GOOGLE_CLIENT_ID</code></td>
+            <td><span class="badge badge-gray">OAuth</span></td>
+            <td>—</td>
+            <td>Google OAuth app client ID. Required if <code>google</code> is in your auth providers.</td>
+          </tr>
+          <tr>
+            <td><code>GOOGLE_CLIENT_SECRET</code></td>
+            <td><span class="badge badge-gray">OAuth</span></td>
+            <td>—</td>
+            <td>Google OAuth app client secret.</td>
+          </tr>
+          <tr>
+            <td><code>GITHUB_CLIENT_ID</code></td>
+            <td><span class="badge badge-gray">OAuth</span></td>
+            <td>—</td>
+            <td>GitHub OAuth app client ID. Required if <code>github</code> is in your auth providers.</td>
+          </tr>
+          <tr>
+            <td><code>GITHUB_CLIENT_SECRET</code></td>
+            <td><span class="badge badge-gray">OAuth</span></td>
+            <td>—</td>
+            <td>GitHub OAuth app client secret.</td>
+          </tr>
+          <tr>
+            <td><code>AUTH_PORT</code></td>
+            <td><span class="badge badge-gray">Sidecar</span></td>
+            <td><code>3456</code></td>
+            <td>Port the Corral auth server listens on internally. Change only if 3456 conflicts.</td>
+          </tr>
+          <tr>
+            <td><code>AUTH_URL</code></td>
+            <td><span class="badge badge-gray">Sidecar</span></td>
+            <td><code>http://localhost:3456</code></td>
+            <td>URL your backend uses to reach the auth server. Always <code>localhost</code> for same-container deployments.</td>
+          </tr>
+          <tr>
+            <td><code>PORT</code></td>
+            <td><span class="badge badge-gray">Optional</span></td>
+            <td><code>8000</code></td>
+            <td>Port your backend listens on. Set automatically by Railway and Fly.io.</td>
+          </tr>
+          <tr>
+            <td><code>SMTP_URL</code></td>
+            <td><span class="badge badge-gray">Email</span></td>
+            <td>—</td>
+            <td>SMTP connection string for magic link emails. Example: <code>smtp://user:pass@host:587</code>.</td>
+          </tr>
+          <tr>
+            <td><code>TURSO_DATABASE_URL</code></td>
+            <td><span class="badge badge-gray">Turso</span></td>
+            <td>—</td>
+            <td>Turso (libSQL) database URL. Use with Vercel or any serverless environment.</td>
+          </tr>
+          <tr>
+            <td><code>TURSO_AUTH_TOKEN</code></td>
+            <td><span class="badge badge-gray">Turso</span></td>
+            <td>—</td>
+            <td>Turso auth token. Required with <code>TURSO_DATABASE_URL</code>.</td>
+          </tr>
+          <tr>
+            <td><code>NODE_ENV</code></td>
+            <td><span class="badge badge-gray">Optional</span></td>
+            <td><code>development</code></td>
+            <td>Set to <code>production</code> in production. Affects Stripe mode (live vs test), cookie security, and logging.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-title">Generate BETTER_AUTH_SECRET</div>
+      <code>openssl rand -base64 32</code> — run this and use the output.
+      It must be at least 32 characters. The same value must be used across
+      all instances of your app (important for horizontal scaling).
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="api.html">← API Reference</a>
+        <a href="quickstart.html">Quickstart →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var hs=document.querySelectorAll('.docs-content h2,.docs-content h3');
+  if(hs.length<2)return;
+  var nav=document.createElement('nav');
+  nav.className='doc-sidebar';
+  nav.innerHTML='<div class="doc-sidebar-title">On This Page</div>';
+  hs.forEach(function(h){
+    if(!h.id)h.id=h.textContent.toLowerCase().replace(/[^\w]+/g,'-').replace(/^-|-$/g,'');
+    var a=document.createElement('a');
+    a.href='#'+h.id;
+    a.textContent=h.textContent.replace(/\s+/g,' ').trim();
+    if(h.tagName==='H3')a.className='h3';
+    nav.appendChild(a);
+  });
+  var layout=document.querySelector('.docs-layout');
+  if(layout)layout.appendChild(nav);
+})();
+</script>
+</body>
+</html>
