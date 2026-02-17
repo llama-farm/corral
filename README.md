@@ -1,4 +1,4 @@
-# 🐴 Corral
+# 🦙 Corral
 
 > Auth, billing, and API gating for SaaS apps — drop-in, batteries included.
 

@@ -1,4 +1,4 @@
-# 🐴 @llamafarm/corral
+# 🦙 @llamafarm/corral
 
 > Auth, billing, and API scaffolding for SaaS apps — batteries included.
 

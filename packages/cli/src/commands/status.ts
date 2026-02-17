@@ -373,7 +373,7 @@ export async function statusCommand(opts: { json?: boolean; config: string; url?
   const row = (label: string, value: string) =>
     console.log(`  ${chalk.dim(label.padEnd(COL))} ${value}`);
 
-  console.log(chalk.bold(`\n🐴 Corral Status\n`));
+  console.log(chalk.bold(`\n🦙 Corral Status\n`));
 
   if (!configLoaded) {
     console.log(chalk.yellow(`  ⚠  No ${opts.config} found — run: corral init\n`));

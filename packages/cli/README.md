@@ -1,4 +1,4 @@
-# 🐴 corral (CLI)
+# 🦙 corral (CLI)
 
 > Scaffold Corral-powered SaaS apps in seconds.
 

@@ -1,4 +1,4 @@
-# 🐴 @llamafarm/corral-ui
+# 🦙 @llamafarm/corral-ui
 
 > React components for Corral — auth flows, billing dashboards, and usage meters.
 
