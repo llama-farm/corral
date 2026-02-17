@@ -28,6 +28,11 @@ export function generateProjectLlmsTxt(configPath: string): string {
   L.push('');
   L.push(`> This app uses Corral for auth + billing. Base URL: ${baseUrl}`);
   L.push('');
+  L.push('## Agent Prompt (copy/paste)');
+  L.push(`Read: ${baseUrl}/llm.txt`);
+  L.push(`# alias: ${baseUrl}/llms.txt`);
+  L.push(`# canonical: ${baseUrl}/.well-known/llms.txt`);
+  L.push('');
   L.push('## Auth Endpoints');
   L.push(`POST ${authBase}/sign-up/email { email, password, name }`);
   L.push(`POST ${authBase}/sign-in/email { email, password }`);
@@ -101,9 +106,16 @@ export function writeProjectLlmsTxt(configPath: string = 'corral.yaml'): void {
     const content = generateProjectLlmsTxt(configPath);
     const dir = 'public/.well-known';
     mkdirSync(dir, { recursive: true });
+
+    // Canonical llms.txt location
     writeFileSync(`${dir}/llms.txt`, content, 'utf-8');
-    success('Updated public/.well-known/llms.txt');
+
+    // Convenience aliases at site root for agents/tools that look for /llm.txt
+    writeFileSync('public/llm.txt', content, 'utf-8');
+    writeFileSync('public/llms.txt', content, 'utf-8');
+
+    success('Updated public/.well-known/llms.txt (+ /llm.txt and /llms.txt aliases)');
   } catch (e: any) {
-    warn(`Could not write public/.well-known/llms.txt: ${e.message}`);
+    warn(`Could not write llms discovery files: ${e.message}`);
   }
 }

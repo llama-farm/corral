@@ -623,6 +623,32 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     d1: '(D1 binding — see wrangler.toml)',
   };
 
+  // Derive CORRAL.md template vars based on detected framework
+  const frameworkLabel =
+    framework.name === 'nextjs' ? 'Next.js' :
+    framework.name === 'vite-react' ? 'Vite + React (SPA)' :
+    framework.name === 'cra' ? 'Create React App (SPA)' :
+    framework.name === 'hono' ? 'Hono' :
+    framework.name === 'express' ? 'Express' :
+    framework.name === 'fastapi' ? 'FastAPI' :
+    framework.name === 'django' ? 'Django' :
+    framework.name === 'flask' ? 'Flask' :
+    'Unknown';
+
+  const serverFileLabel =
+    framework.name === 'nextjs' ? 'app/api/auth/[...all]/route.ts' :
+    framework.name === 'hono' ? 'src/routes/auth.ts' :
+    framework.isSPA ? 'server/auth.ts' :
+    'lib/corral.ts (mounted in your server)';
+
+  const envSuffix =
+    framework.name === 'nextjs' ? '.local' : '';
+
+  const startCommandLabel =
+    framework.name === 'nextjs' ? 'npm run dev' :
+    framework.isSPA ? 'npm run dev   # starts Vite; separately: npx tsx server/auth.ts' :
+    'npm run dev   # or: npx tsx server/auth.ts';
+
   const vars = {
     APP_NAME: appName,
     APP_ID: appId,
@@ -630,10 +656,29 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     DB_URL: dbUrlDefaults[db] || dbUrlDefaults['sqlite'],
     DB_PATH: db === 'sqlite' ? './corral.db' : dbUrlDefaults[db] || '',
     PORT: String(authServerPort),
+    FRONTEND_PORT: String(framework.port),
     APP_ID_UPPER: appId.toUpperCase().replace(/-/g, '_'),
+    FRAMEWORK: frameworkLabel,
+    SERVER_FILE: serverFileLabel,
+    ENV_SUFFIX: envSuffix,
+    START_COMMAND: startCommandLabel,
+    TRIAL_DAYS: '14',
+    DEFAULT_PAID_PLAN: 'pro',
+    AUTH_IMPORT_PATH: '../auth-context',
+    PLAN_NAMES: 'free, pro',
+    PAID_PLAN: 'pro',
+    PAID_PLAN_DISPLAY: 'Pro',
+    PAID_PLAN_PRICE: '29',
+    SUCCESS_URL: '/?upgraded=true',
+    CANCEL_URL: '/?cancelled=true',
   };
   const results: string[] = [];
   const warnings: string[] = [];
+
+  // ─── Monorepo detection (run early so we can adjust messaging) ────
+  // Only relevant for SPAs — if there's already a sibling server workspace,
+  // install into it instead of scaffolding a new standalone auth server.
+  const existingServer = framework.isSPA ? detectExistingServer() : null;
 
   console.log(chalk.bold(`\n🤠 Corral init — ${appName}\n`));
   info(`Framework: ${framework.name} (port ${framework.port})`);
@@ -641,6 +686,9 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     info(`Architecture: Python backend — will generate auth middleware + standalone auth server`);
     info(`Auth server port: ${authServerPort}`);
     info(`Python backend port: ${framework.port}`);
+  } else if (framework.isSPA && existingServer) {
+    info(`Architecture: Monorepo SPA + existing ${existingServer.framework} server at ${existingServer.path}`);
+    info(`  Will install corral.ts into ${existingServer.srcDir}/ (no new auth server scaffolded)`);
   } else if (framework.isSPA) {
     info(`Architecture: SPA (client-only) — will scaffold standalone auth server`);
     info(`Auth server port: ${authServerPort}`);
@@ -664,158 +712,256 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     success('Created CORRAL.md (agent discovery file)');
   }
 
-  // Step 3 & 4: Generate server files (architecture-dependent)
-  if (framework.isSPA) {
-    // ─── SPA: standalone auth server in server/ directory ────────────
-    // Pick server framework: --server flag, or detect from existing deps, or default to express
-    let serverChoice = opts.server || 'express';
-    if (!opts.server) {
-      try {
-        const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
-        const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-        if (allDeps['hono']) serverChoice = 'hono';
-        else if (allDeps['fastify']) serverChoice = 'fastify';
-      } catch {}
-    }
-    const serverDir = 'server';
-    mkdirSync(serverDir, { recursive: true });
-
-    info(`Auth server framework: ${serverChoice}`);
-
-    // server/corral.ts — auth setup (database-specific template)
-    const setupTemplateMap: Record<string, string> = {
-      sqlite: 'setup-spa.ts.tmpl',
-      pg: 'setup-pg.ts.tmpl',
-      mysql: 'setup-mysql.ts.tmpl',
-      turso: 'setup-turso.ts.tmpl',
-      d1: 'setup-d1.ts.tmpl',
-    };
-    const setupTemplate = setupTemplateMap[db] || 'setup-spa.ts.tmpl';
-    const setupPath = join(serverDir, 'corral.ts');
-    if (!existsSync(setupPath)) {
-      writeFileSync(setupPath, replaceVars(loadTemplate(setupTemplate), vars));
-      results.push(setupPath);
-      success(`Created ${setupPath} (auth setup — ${db})`);
-    }
-
-    // server/auth.ts — server entrypoint (framework-specific)
-    const serverTemplateMap: Record<string, string> = {
-      express: 'server-express.ts.tmpl',
-      hono: 'server-hono.ts.tmpl',
-      fastify: 'server-fastify.ts.tmpl',
-    };
-    const serverPath = join(serverDir, 'auth.ts');
-    if (!existsSync(serverPath)) {
-      writeFileSync(serverPath, replaceVars(loadTemplate(serverTemplateMap[serverChoice]), vars));
-      results.push(serverPath);
-      success(`Created ${serverPath} (${serverChoice} auth server)`);
-    }
-
-    // Add dev:auth script to package.json
+  // ─── Shared helper: generate gates.tsx with dynamic PLAN_RANK ──────
+  async function generateGates(destPath: string): Promise<void> {
+    if (existsSync(destPath)) return;
+    let gatesContent = replaceVars(loadTemplate('gates.tsx.tmpl'), vars);
     try {
-      const pkgPath = 'package.json';
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-      if (!pkg.scripts) pkg.scripts = {};
-      if (!pkg.scripts['dev:auth']) {
-        pkg.scripts['dev:auth'] = 'npx tsx server/auth.ts';
-        // Also add a combined dev script if they have a plain 'dev'
-        if (pkg.scripts['dev'] && !pkg.scripts['dev:all']) {
-          pkg.scripts['dev:all'] = `concurrently "npm run dev" "npm run dev:auth"`;
-          info('Added dev:all script (install concurrently: npm i -D concurrently)');
-        }
-        writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-        success('Added dev:auth script to package.json');
+      const yaml = await import('yaml');
+      const yamlContent = readFileSync(join(process.cwd(), 'corral.yaml'), 'utf-8');
+      const parsedConfig = yaml.parse(yamlContent);
+      const plans = parsedConfig?.plans || [];
+      const planNames: string[] = plans.map((p: any) => typeof p === 'string' ? p : (p.name || '')).filter(Boolean);
+      if (planNames.length > 0) {
+        const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
+        const dynamicRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
+        gatesContent = gatesContent.replace(/const PLAN_RANK: Record<string, number> = \{[^}]*\}/, dynamicRank);
       }
     } catch {}
+    mkdirSync(dirname(destPath), { recursive: true });
+    writeFileSync(destPath, gatesContent);
+    results.push(destPath);
+    success(`Created ${destPath} (AuthGate, PlanGate, BlurGate components)`);
+  }
 
-    // ─── Frontend files: auth-context.tsx + gates.tsx ─────────────────
-    // Detect src directory
+  // Step 3 & 4: Generate server files (architecture-dependent)
+  if (framework.isSPA) {
     const srcDir = existsSync('src') ? 'src' : '.';
 
-    const authContextPath = join(srcDir, 'auth-context.tsx');
-    if (!existsSync(authContextPath)) {
-      writeFileSync(authContextPath, replaceVars(loadTemplate('auth-context.tsx.tmpl'), vars));
-      results.push(authContextPath);
-      success(`Created ${authContextPath} (React auth provider + useAuth hook)`);
-    }
+    if (existingServer) {
+      // ─── MONOREPO PATH: existing server found ──────────────────────
+      // Install corral.ts into the server's src/, skip scaffolding new server.
+      info(`Found existing ${existingServer.framework} server at ${existingServer.path} — using it for auth`);
 
-    const gatesPath = join(srcDir, 'gates.tsx');
-    if (!existsSync(gatesPath)) {
-      let gatesContent = replaceVars(loadTemplate('gates.tsx.tmpl'), vars);
-      try {
-        const yaml = await import('yaml');
-        const yamlContent = readFileSync(join(process.cwd(), 'corral.yaml'), 'utf-8');
-        const parsedConfig = yaml.parse(yamlContent);
-        const plans = parsedConfig?.plans || [];
-        const planNames: string[] = plans.map((p: any) => typeof p === 'string' ? p : (p.name || '')).filter(Boolean);
-        if (planNames.length > 0) {
-          const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
-          const dynamicRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
-          gatesContent = gatesContent.replace(/const PLAN_RANK: Record<string, number> = \{[^}]*\}/, dynamicRank);
+      const setupTemplateMap: Record<string, string> = {
+        sqlite: 'setup-spa.ts.tmpl',
+        pg: 'setup-pg.ts.tmpl',
+        mysql: 'setup-mysql.ts.tmpl',
+        turso: 'setup-turso.ts.tmpl',
+        d1: 'setup-d1.ts.tmpl',
+      };
+      const setupTemplate = setupTemplateMap[db] || 'setup-spa.ts.tmpl';
+
+      // Copy corral.ts into the existing server's src/
+      const serverCorralPath = join(existingServer.srcDir, 'corral.ts');
+      if (!existsSync(serverCorralPath)) {
+        writeFileSync(serverCorralPath, replaceVars(loadTemplate(setupTemplate), vars));
+        results.push(serverCorralPath);
+        success(`Created ${serverCorralPath} (auth setup — ${db})`);
+      }
+
+      // Generate mount instructions (and optionally auto-patch server entry)
+      const mountSnippet = existingServer.framework === 'hono'
+        ? `import { auth } from './corral.js';\nimport { serve } from '@hono/node-server';\n// Mount Corral auth:\napp.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));`
+        : existingServer.framework === 'fastify'
+        ? `import { auth } from './corral.js';\nimport { toNodeHandler } from 'better-auth/node';\n// Mount Corral auth:\napp.all('/api/auth/*', toNodeHandler(auth));`
+        : `import { auth } from './corral.js';\nimport { toNodeHandler } from 'better-auth/node';\n// Mount Corral auth:\nconst authHandler = toNodeHandler(auth);\napp.all('/api/auth/*', (req, res) => authHandler(req, res));`;
+
+      // Try to auto-patch the server entry file
+      if (existsSync(existingServer.entryFile)) {
+        const entryContent = readFileSync(existingServer.entryFile, 'utf-8');
+        if (!entryContent.includes('corral') && !entryContent.includes('better-auth')) {
+          // Prepend mount instructions as a comment block so it's safe to review
+          const patchedContent =
+            `// ─── Corral Auth (added by corral init) ───────────────────────────\n` +
+            `// ${mountSnippet.split('\n').join('\n// ')}\n` +
+            `// ──────────────────────────────────────────────────────────────────\n\n` +
+            entryContent;
+          writeFileSync(existingServer.entryFile, patchedContent);
+          success(`Prepended auth mount instructions to ${existingServer.entryFile} (commented — review and uncomment)`);
+        } else {
+          info(`${existingServer.entryFile} already references auth — skipping patch`);
         }
-      } catch {}
-      writeFileSync(gatesPath, gatesContent);
-      results.push(gatesPath);
-      success(`Created ${gatesPath} (AuthGate, PlanGate, BlurGate components)`);
-    }
-
-    // ─── SQL reference file (dialect-specific) ────────────────────────
-    const sqlTemplateMap: Record<string, string> = {
-      sqlite: 'corral-tables.sql.tmpl',
-      pg: 'corral-tables-pg.sql.tmpl',
-      mysql: 'corral-tables.sql.tmpl',  // MySQL bootstrap is in the setup file
-      turso: 'corral-tables.sql.tmpl',  // Turso uses SQLite syntax
-      d1: 'corral-tables.sql.tmpl',     // D1 uses SQLite syntax
-    };
-    const sqlPath = join(serverDir, 'corral-tables.sql');
-    if (!existsSync(sqlPath)) {
-      writeFileSync(sqlPath, replaceVars(loadTemplate(sqlTemplateMap[db] || 'corral-tables.sql.tmpl'), vars));
-      results.push(sqlPath);
-      success(`Created ${sqlPath} (${db} tables — auto-created on first run)`);
-      if (db === 'd1') {
-        info('For D1: run `npx wrangler d1 execute corral-auth --file=./server/corral-tables.sql`');
-      }
-    }
-
-    // ─── LEARNING #6: Auto-patch vite.config.ts with /api proxy ─────
-    for (const viteConfig of ['vite.config.ts', 'vite.config.js', 'vite.config.mjs']) {
-      if (!existsSync(viteConfig)) continue;
-      let content = readFileSync(viteConfig, 'utf-8');
-
-      // Skip if proxy already configured
-      if (content.includes("'/api'") || content.includes('"/api"') || content.includes("proxy")) {
-        info(`${viteConfig} already has proxy config — skipping auto-patch`);
-        break;
       }
 
-      // Try to inject proxy into existing server block
-      if (content.includes('server:') || content.includes('server :')) {
-        // Has server block — add proxy inside it
-        const serverMatch = content.match(/(server\s*:\s*\{)/);
-        if (serverMatch) {
-          const proxyBlock = `\n    proxy: {\n      '/api': {\n        target: 'http://localhost:${authServerPort}',\n        changeOrigin: true,\n      },\n    },`;
-          content = content.replace(serverMatch[1], serverMatch[1] + proxyBlock);
-          writeFileSync(viteConfig, content);
-          success(`Auto-patched ${viteConfig} — added /api proxy to localhost:${authServerPort}`);
+      // Create corral-admin-routes.ts in the server
+      const adminApiPath = join(existingServer.srcDir, 'corral-admin-routes.ts');
+      if (!existsSync(adminApiPath)) {
+        writeFileSync(adminApiPath, replaceVars(loadTemplate('admin-api.ts.tmpl'), vars));
+        results.push(adminApiPath);
+        success(`Created ${adminApiPath} (admin & billing API routes)`);
+        info(`Mount: app.use('/api/corral', (await import('./corral-admin-routes.js')).default)`);
+      }
+
+      // SQL reference in server dir
+      const sqlTemplateMap: Record<string, string> = {
+        sqlite: 'corral-tables.sql.tmpl', pg: 'corral-tables-pg.sql.tmpl',
+        mysql: 'corral-tables.sql.tmpl', turso: 'corral-tables.sql.tmpl', d1: 'corral-tables.sql.tmpl',
+      };
+      const sqlPath = join(existingServer.path, 'corral-tables.sql');
+      if (!existsSync(sqlPath)) {
+        writeFileSync(sqlPath, replaceVars(loadTemplate(sqlTemplateMap[db] || 'corral-tables.sql.tmpl'), vars));
+        results.push(sqlPath);
+        success(`Created ${sqlPath}`);
+      }
+
+      // ─── Frontend files ────────────────────────────────────────────
+      const authContextPath = join(srcDir, 'auth-context.tsx');
+      if (!existsSync(authContextPath)) {
+        writeFileSync(authContextPath, replaceVars(loadTemplate('auth-context.tsx.tmpl'), vars));
+        results.push(authContextPath);
+        success(`Created ${authContextPath} (React auth provider + useAuth hook)`);
+      }
+
+      await generateGates(join(srcDir, 'gates.tsx'));
+      await scaffoldFrontendComponents(srcDir, vars, results, existingServer);
+
+      // Patch Vite proxy to point to the existing server (with port detection)
+      const serverPort = getViteProxyServerPort(existingServer.framework === 'express' ? 3001 : 8080);
+      for (const viteConfig of ['vite.config.ts', 'vite.config.js', 'vite.config.mjs']) {
+        if (!existsSync(viteConfig)) continue;
+        let content = readFileSync(viteConfig, 'utf-8');
+        if (content.includes('proxy')) {
+          info(`${viteConfig} already has proxy config — skipping`);
           break;
         }
-      }
-
-      // No server block — inject before closing defineConfig paren
-      const configMatch = content.match(/(defineConfig\(\{[\s\S]*?)(}\s*\))/);
-      if (configMatch) {
-        const proxyConfig = `  server: {\n    proxy: {\n      '/api': {\n        target: 'http://localhost:${authServerPort}',\n        changeOrigin: true,\n      },\n    },\n  },\n`;
-        content = content.replace(configMatch[2], proxyConfig + configMatch[2]);
-        writeFileSync(viteConfig, content);
-        success(`Auto-patched ${viteConfig} — added server.proxy for /api → localhost:${authServerPort}`);
+        const configMatch = content.match(/(defineConfig\(\{[\s\S]*?)(}\s*\))/);
+        if (configMatch) {
+          const proxyConfig = `  server: {\n    proxy: {\n      '/api': {\n        target: 'http://localhost:${serverPort}',\n        changeOrigin: true,\n      },\n    },\n  },\n`;
+          content = content.replace(configMatch[2], proxyConfig + configMatch[2]);
+          writeFileSync(viteConfig, content);
+          success(`Auto-patched ${viteConfig} — /api → existing server at localhost:${serverPort}`);
+        }
         break;
       }
 
-      // Couldn't auto-patch — give instructions
-      info(`\n💡 Add this to your ${viteConfig} for seamless dev auth:\n`);
-      console.log(chalk.cyan(`   server: {\n     proxy: {\n       '/api': {\n         target: 'http://localhost:${authServerPort}',\n         changeOrigin: true,\n       },\n     },\n   }`));
-      console.log('');
-      break;
+    } else {
+      // ─── STANDALONE PATH: no existing server found ─────────────────
+      // Scaffold a new standalone auth server in server/
+      let serverChoice = opts.server || 'express';
+      if (!opts.server) {
+        try {
+          const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+          const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+          if (allDeps['hono']) serverChoice = 'hono';
+          else if (allDeps['fastify']) serverChoice = 'fastify';
+        } catch {}
+      }
+      const serverDir = 'server';
+      mkdirSync(serverDir, { recursive: true });
+
+      info(`Auth server framework: ${serverChoice}`);
+
+      // server/corral.ts — auth setup (database-specific template)
+      const setupTemplateMap: Record<string, string> = {
+        sqlite: 'setup-spa.ts.tmpl',
+        pg: 'setup-pg.ts.tmpl',
+        mysql: 'setup-mysql.ts.tmpl',
+        turso: 'setup-turso.ts.tmpl',
+        d1: 'setup-d1.ts.tmpl',
+      };
+      const setupTemplate = setupTemplateMap[db] || 'setup-spa.ts.tmpl';
+      const setupPath = join(serverDir, 'corral.ts');
+      if (!existsSync(setupPath)) {
+        writeFileSync(setupPath, replaceVars(loadTemplate(setupTemplate), vars));
+        results.push(setupPath);
+        success(`Created ${setupPath} (auth setup — ${db})`);
+      }
+
+      // server/auth.ts — server entrypoint (framework-specific)
+      const serverTemplateMap: Record<string, string> = {
+        express: 'server-express.ts.tmpl',
+        hono: 'server-hono.ts.tmpl',
+        fastify: 'server-fastify.ts.tmpl',
+      };
+      const serverPath = join(serverDir, 'auth.ts');
+      if (!existsSync(serverPath)) {
+        writeFileSync(serverPath, replaceVars(loadTemplate(serverTemplateMap[serverChoice]), vars));
+        results.push(serverPath);
+        success(`Created ${serverPath} (${serverChoice} auth server)`);
+      }
+
+      // Add dev:auth script to package.json
+      try {
+        const pkgPath = 'package.json';
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+        if (!pkg.scripts) pkg.scripts = {};
+        if (!pkg.scripts['dev:auth']) {
+          pkg.scripts['dev:auth'] = 'npx tsx server/auth.ts';
+          if (pkg.scripts['dev'] && !pkg.scripts['dev:all']) {
+            pkg.scripts['dev:all'] = `concurrently "npm run dev" "npm run dev:auth"`;
+            info('Added dev:all script (install concurrently: npm i -D concurrently)');
+          }
+          writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+          success('Added dev:auth script to package.json');
+        }
+      } catch {}
+
+      // ─── Frontend files ────────────────────────────────────────────
+      const authContextPath = join(srcDir, 'auth-context.tsx');
+      if (!existsSync(authContextPath)) {
+        writeFileSync(authContextPath, replaceVars(loadTemplate('auth-context.tsx.tmpl'), vars));
+        results.push(authContextPath);
+        success(`Created ${authContextPath} (React auth provider + useAuth hook)`);
+      }
+
+      await generateGates(join(srcDir, 'gates.tsx'));
+      await scaffoldFrontendComponents(srcDir, vars, results, null);
+
+      // ─── SQL reference file ────────────────────────────────────────
+      const sqlTemplateMap: Record<string, string> = {
+        sqlite: 'corral-tables.sql.tmpl',
+        pg: 'corral-tables-pg.sql.tmpl',
+        mysql: 'corral-tables.sql.tmpl',
+        turso: 'corral-tables.sql.tmpl',
+        d1: 'corral-tables.sql.tmpl',
+      };
+      const sqlPath = join(serverDir, 'corral-tables.sql');
+      if (!existsSync(sqlPath)) {
+        writeFileSync(sqlPath, replaceVars(loadTemplate(sqlTemplateMap[db] || 'corral-tables.sql.tmpl'), vars));
+        results.push(sqlPath);
+        success(`Created ${sqlPath} (${db} tables — auto-created on first run)`);
+        if (db === 'd1') {
+          info('For D1: run `npx wrangler d1 execute corral-auth --file=./server/corral-tables.sql`');
+        }
+      }
+
+      // ─── Auto-patch vite.config.ts — use detected server port ─────
+      const detectedPort = getViteProxyServerPort(authServerPort);
+      for (const viteConfig of ['vite.config.ts', 'vite.config.js', 'vite.config.mjs']) {
+        if (!existsSync(viteConfig)) continue;
+        let content = readFileSync(viteConfig, 'utf-8');
+
+        if (content.includes("'/api'") || content.includes('"/api"') || content.includes('proxy')) {
+          info(`${viteConfig} already has proxy config — skipping auto-patch`);
+          break;
+        }
+
+        if (content.includes('server:') || content.includes('server :')) {
+          const serverMatch = content.match(/(server\s*:\s*\{)/);
+          if (serverMatch) {
+            const proxyBlock = `\n    proxy: {\n      '/api': {\n        target: 'http://localhost:${detectedPort}',\n        changeOrigin: true,\n      },\n    },`;
+            content = content.replace(serverMatch[1], serverMatch[1] + proxyBlock);
+            writeFileSync(viteConfig, content);
+            success(`Auto-patched ${viteConfig} — added /api proxy to localhost:${detectedPort}`);
+            break;
+          }
+        }
+
+        const configMatch = content.match(/(defineConfig\(\{[\s\S]*?)(}\s*\))/);
+        if (configMatch) {
+          const proxyConfig = `  server: {\n    proxy: {\n      '/api': {\n        target: 'http://localhost:${detectedPort}',\n        changeOrigin: true,\n      },\n    },\n  },\n`;
+          content = content.replace(configMatch[2], proxyConfig + configMatch[2]);
+          writeFileSync(viteConfig, content);
+          success(`Auto-patched ${viteConfig} — added server.proxy for /api → localhost:${detectedPort}`);
+          break;
+        }
+
+        info(`\n💡 Add to your ${viteConfig}:`);
+        console.log(chalk.cyan(`   server: {\n     proxy: {\n       '/api': {\n         target: 'http://localhost:${detectedPort}',\n         changeOrigin: true,\n       },\n     },\n   }`));
+        console.log('');
+        break;
+      }
     }
 
   } else if (framework.isPython) {
@@ -969,27 +1115,10 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
       success(`Created ${nextAuthContextPath} (useAuth hook + AuthProvider)`);
     }
 
-    const nextGatesPath = join(nextSrcDir, 'gates.tsx');
-    if (!existsSync(nextGatesPath)) {
-      mkdirSync(dirname(nextGatesPath), { recursive: true });
-      let gatesContent = replaceVars(loadTemplate('gates.tsx.tmpl'), vars);
-      // Build PLAN_RANK dynamically from corral.yaml plans
-      try {
-        const yaml = await import('yaml');
-        const yamlContent = readFileSync(join(process.cwd(), 'corral.yaml'), 'utf-8');
-        const parsedConfig = yaml.parse(yamlContent);
-        const plans = parsedConfig?.plans || [];
-        const planNames: string[] = plans.map((p: any) => typeof p === 'string' ? p : (p.name || '')).filter(Boolean);
-        if (planNames.length > 0) {
-          const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
-          const dynamicRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
-          gatesContent = gatesContent.replace(/const PLAN_RANK: Record<string, number> = \{[^}]*\}/, dynamicRank);
-        }
-      } catch {}
-      writeFileSync(nextGatesPath, gatesContent);
-      results.push(nextGatesPath);
-      success(`Created ${nextGatesPath} (AuthGate, PlanGate, BlurGate components)`);
-    }
+    await generateGates(join(nextSrcDir, 'gates.tsx'));
+
+    // Scaffold admin/profile/billing UI components
+    await scaffoldFrontendComponents(nextSrcDir, vars, results, null);
 
     // Wrap {children} in AuthProvider in app/layout.tsx
     const layoutPath = 'app/layout.tsx';
@@ -1170,6 +1299,11 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     warnings,
     appName,
     appId,
+    monorepo: existingServer ? {
+      serverPath: existingServer.path,
+      serverFramework: existingServer.framework,
+      entryFile: existingServer.entryFile,
+    } : null,
   }, !!opts.json)) return;
 
   // Human-friendly next steps
@@ -1187,12 +1321,31 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     console.log(`  4. Add ${chalk.cyan('Depends(get_current_user)')} to your protected routes`);
     console.log(`  5. Configure reverse proxy (nginx/caddy) to route /api/auth → auth server`);
     console.log(`  6. Edit ${chalk.cyan('corral.yaml')} with your plans and branding`);
+  } else if (framework.isSPA && existingServer) {
+    console.log(`  1. Edit ${chalk.cyan('corral.yaml')} with your plans, meters, and branding`);
+    console.log(`  2. Review ${chalk.cyan(existingServer.entryFile)} — uncomment the Corral auth mount`);
+    console.log(`  3. Start your existing server (auth is now part of it)`);
+    console.log(`  4. Start your frontend: ${chalk.cyan('npm run dev')}`);
+    console.log(`  5. Run ${chalk.cyan('corral doctor')} to verify setup`);
+    console.log(`  6. Run ${chalk.cyan('corral stripe sync')} to sync plans to Stripe`);
+    console.log('');
+    console.log(chalk.bold('  New UI components generated:'));
+    console.log(`    ${chalk.cyan('•')} src/components/AdminPanel.tsx — admin user management`);
+    console.log(`    ${chalk.cyan('•')} src/components/ProfilePage.tsx — profile + billing`);
+    console.log(`    ${chalk.cyan('•')} src/components/AccountMenu.tsx — nav dropdown`);
+    console.log(`    ${chalk.cyan('•')} src/corral-styles.css — import in your app`);
   } else if (framework.isSPA) {
     console.log(`  1. Edit ${chalk.cyan('corral.yaml')} with your plans, meters, and branding`);
     console.log(`  2. Start auth server: ${chalk.cyan('npm run dev:auth')}`);
     console.log(`  3. Start your app: ${chalk.cyan('npm run dev')} (or ${chalk.cyan('npm run dev:all')} for both)`);
     console.log(`  4. Run ${chalk.cyan('corral doctor')} to verify setup`);
     console.log(`  5. Run ${chalk.cyan('corral stripe sync')} to sync plans to Stripe`);
+    console.log('');
+    console.log(chalk.bold('  New UI components generated:'));
+    console.log(`    ${chalk.cyan('•')} src/components/AdminPanel.tsx — admin user management`);
+    console.log(`    ${chalk.cyan('•')} src/components/ProfilePage.tsx — profile + billing`);
+    console.log(`    ${chalk.cyan('•')} src/components/AccountMenu.tsx — nav dropdown`);
+    console.log(`    ${chalk.cyan('•')} src/corral-styles.css — import in your app`);
   } else {
     console.log(`  1. Edit ${chalk.cyan('corral.yaml')} with your plans, meters, and branding`);
     console.log(`  2. Run ${chalk.cyan('corral doctor')} to verify setup`);

@@ -24,9 +24,13 @@ app.use(cors({
   credentials: true,
 }));
 
-// Mount Better Auth — /api/auth/* works in BOTH Express 4 and 5
+// Mount Better Auth — middleware pattern works in BOTH Express 4 and 5
+// (app.all with wildcards has incompatible syntax between v4 and v5)
 const authHandler = toNodeHandler(auth);
-app.all("/api/auth/*", (req, res) => authHandler(req, res));
+app.use((req: any, res: any, next: any) => {
+  if (req.url.startsWith("/api/auth")) return authHandler(req, res);
+  next();
+});
 
 app.use(express.json());
 
