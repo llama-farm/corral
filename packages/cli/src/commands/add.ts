@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import { parse, stringify } from 'yaml';
 import { Command, type OptionValues } from 'commander';
 import chalk from 'chalk';
@@ -26,6 +27,7 @@ function replaceVars(tmpl: string, vars: Record<string, string>): string {
   let result = tmpl;
   for (const [k, v] of Object.entries(vars)) {
     result = result.replaceAll(`{{${k}}}`, v);
+    result = result.replaceAll(`[[${k}]]`, v);
   }
   return result;
 }
@@ -113,18 +115,42 @@ async function addPageCommand(
   const rawName = opts.name || pagePath.split('/').filter(Boolean).pop() || 'Page';
   const componentName = toPascalCase(rawName);
   const results: string[] = [];
+  // Strip leading slash to avoid double-slash in route display
+  const cleanPath = pagePath.replace(/^\/+/, '');
 
-  console.log(chalk.bold(`\n📄 corral add page — ${pagePath}\n`));
+  console.log(chalk.bold(`\n📄 corral add page — ${cleanPath}\n`));
   info(`Framework: ${framework}`);
   if (opts.gated) info(`Gated: ${chalk.cyan(opts.gated)} plan`);
+
+  // Ensure gates.tsx exists when gated, so PlanGate can be imported locally
+  if (opts.gated) {
+    const srcDir = existsSync('src') ? 'src' : '.';
+    const gatesPath = join(srcDir, 'gates.tsx');
+    if (!existsSync(gatesPath) && !opts.dryRun) {
+      try {
+        const appName = config?.app?.name || process.cwd().split('/').pop() || 'App';
+        const gatesTmpl = loadTemplate('gates.tsx.tmpl');
+        const gatesContent = replaceVars(gatesTmpl, { APP_NAME: appName });
+        mkdirSync(dirname(gatesPath), { recursive: true });
+        writeFileSync(gatesPath, gatesContent);
+        results.push(gatesPath);
+        info(`Created ${gatesPath} (PlanGate / AuthGate / BlurGate components)`);
+      } catch {
+        warn(`Could not auto-create gates.tsx — PlanGate import may need adjustment`);
+      }
+    }
+  }
 
   // Build the JSX body
   const bodyContent = opts.gated
     ? `      <PlanGate plan="${opts.gated}">\n        <div>\n          <h1>${componentName}</h1>\n          <p>This content is available on the ${opts.gated} plan.</p>\n        </div>\n      </PlanGate>`
     : `      <div>\n        <h1>${componentName}</h1>\n        <p>Welcome to ${componentName}.</p>\n      </div>`;
 
+  // Use local gates.tsx instead of the non-existent @llamafarm/corral/ui package
   const gateImport = opts.gated
-    ? `import { PlanGate } from '@llamafarm/corral/ui';\n`
+    ? (framework === 'nextjs'
+        ? `import { PlanGate } from '@/gates';\n`
+        : `import { PlanGate } from '../gates';\n`)
     : '';
 
   let outputPath: string;
@@ -132,7 +158,7 @@ async function addPageCommand(
 
   if (framework === 'nextjs') {
     // Next.js App Router — create app/<path>/page.tsx
-    outputPath = join('app', pagePath, 'page.tsx');
+    outputPath = join('app', cleanPath, 'page.tsx');
     fileContent = `${gateImport ? '"use client";\n\n' : ''
 }${gateImport}export default function ${componentName}Page() {
   return (
@@ -143,7 +169,7 @@ ${bodyContent}
 }
 `;
     info(`Next.js detected — creating ${chalk.cyan(outputPath)}`);
-    info(`Route will be auto-registered at: /${pagePath}`);
+    info(`Route will be auto-registered at: /${cleanPath}`);
   } else if (framework === 'vite-react' || framework === 'cra') {
     // React SPA — create src/pages/<Name>.tsx
     outputPath = join('src', 'pages', `${componentName}.tsx`);
@@ -158,7 +184,7 @@ ${bodyContent}
 export default ${componentName}Page;
 `;
     info(`React SPA detected — creating ${chalk.cyan(outputPath)}`);
-    info(`Add to your router: ${chalk.cyan(`<Route path="/${pagePath}" element={<${componentName}Page />} />`)}`);
+    info(`Add to your router: ${chalk.cyan(`<Route path="/${cleanPath}" element={<${componentName}Page />} />`)}`);
   } else {
     // Unknown / Express — create src/pages/<Name>.tsx
     outputPath = join('src', 'pages', `${componentName}.tsx`);
@@ -239,13 +265,55 @@ async function addFeatureCommand(
 
 async function addMeterCommand(
   name: string,
-  opts: { limit: string; plan: string; period?: string; json?: boolean; config: string; dryRun?: boolean },
+  opts: {
+    limit?: string;
+    plan?: string;
+    period?: string;
+    free?: string;
+    pro?: string;
+    team?: string;
+    enterprise?: string;
+    json?: boolean;
+    config: string;
+    dryRun?: boolean;
+  },
 ) {
   const config = readConfig(opts.config);
-  const limit = parseInt(opts.limit, 10);
+  const period = opts.period || 'monthly';
+  const resetPeriod = period === 'daily' ? 'day' : 'month';
 
-  if (isNaN(limit)) {
-    error(`--limit must be a number, got: ${opts.limit}`);
+  // Build the limits map from all sources (shorthand flags + --limit/--plan)
+  const newLimits: Record<string, number> = {};
+
+  // Shorthand flags: --free, --pro, --team, --enterprise
+  for (const [planName, rawVal] of [
+    ['free', opts.free],
+    ['pro', opts.pro],
+    ['team', opts.team],
+    ['enterprise', opts.enterprise],
+  ] as [string, string | undefined][]) {
+    if (rawVal !== undefined) {
+      const v = parseInt(rawVal, 10);
+      if (isNaN(v)) { error(`--${planName} must be a number, got: ${rawVal}`); process.exit(1); }
+      newLimits[planName] = v;
+    }
+  }
+
+  // --limit + --plan flags
+  if (opts.limit && opts.plan) {
+    const v = parseInt(opts.limit, 10);
+    if (isNaN(v)) { error(`--limit must be a number, got: ${opts.limit}`); process.exit(1); }
+    newLimits[opts.plan.toLowerCase()] = v;
+  } else if (opts.limit && !opts.plan) {
+    error('--limit requires --plan (or use --free/--pro/--team/--enterprise shorthand)');
+    process.exit(1);
+  } else if (opts.plan && !opts.limit) {
+    error('--plan requires --limit (or use --free/--pro/--team/--enterprise shorthand)');
+    process.exit(1);
+  }
+
+  if (Object.keys(newLimits).length === 0) {
+    error('Provide --limit <n> --plan <name>, or shorthand flags: --free <n> --pro <n> --team <n> --enterprise <n>');
     process.exit(1);
   }
 
@@ -253,43 +321,45 @@ async function addMeterCommand(
 
   if (!config.meters) config.meters = {};
 
-  // Support key as object key (convert dashes to underscores for YAML keys)
+  // Convert dashes to underscores for YAML keys
   const meterKey = name.replace(/-/g, '_');
 
+  const resetPeriodStr = period === 'daily' ? 'day' : 'month';
+
   if (config.meters[meterKey]) {
-    warn(`Meter "${meterKey}" already exists — overwriting`);
+    // MERGE: preserve existing limits, add/update only the new ones
+    info(`Meter "${meterKey}" exists — merging limits`);
+    if (!config.meters[meterKey].limits) config.meters[meterKey].limits = {};
+    Object.assign(config.meters[meterKey].limits, newLimits);
+  } else {
+    // CREATE: brand-new meter entry
+    config.meters[meterKey] = {
+      label: name
+        .split('-')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' '),
+      unit: 'requests',
+      type: 'cap',
+      reset_period: resetPeriodStr,
+      limits: newLimits,
+      warning_at: 0.8,
+      nudge: {
+        message: `You've used {{percent}}% of your ${name} limit`,
+        cta: 'Upgrade',
+      },
+    };
   }
-
-  const period = opts.period || 'monthly';
-  const resetPeriod = period === 'daily' ? 'day' : 'month';
-
-  config.meters[meterKey] = {
-    label: name
-      .split('-')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' '),
-    unit: 'requests',
-    type: 'cap',
-    reset_period: resetPeriod,
-    limits: {
-      [opts.plan]: limit,
-    },
-    warning_at: 0.8,
-    nudge: {
-      message: `You've used {{percent}}% of your ${name} limit`,
-      cta: 'Upgrade',
-    },
-  };
 
   writeConfig(opts.config, config, !!opts.dryRun);
 
   if (!opts.dryRun) {
-    success(`Added meter "${meterKey}" (limit: ${limit}/${resetPeriod} for plan: ${opts.plan}) to ${opts.config}`);
+    const limitsStr = Object.entries(newLimits).map(([p, l]) => `${p}: ${l}`).join(', ');
+    success(`Updated meter "${meterKey}" (limits: ${limitsStr}/${resetPeriodStr}) in ${opts.config}`);
   }
   info(`Track usage: ${chalk.cyan(`corral.meter.increment('${name}', userId)`)}`);
   info(`Check limit: ${chalk.cyan(`corral.meter.check('${name}', userId)`)}`);
 
-  if (jsonOutput({ name, meterKey, limit, plan: opts.plan, period: resetPeriod, config: opts.config }, !!opts.json)) return;
+  if (jsonOutput({ name, meterKey, limits: newLimits, period: resetPeriodStr, config: opts.config }, !!opts.json)) return;
 }
 
 // ─── Command: add provider ────────────────────────────────────────────────────
@@ -385,14 +455,17 @@ async function addPlanCommand(
     process.exit(1);
   }
 
-  console.log(chalk.bold(`\n💳 corral add plan — ${name}\n`));
+  // Always normalize plan names to lowercase
+  const planName = name.toLowerCase();
+
+  console.log(chalk.bold(`\n💳 corral add plan — ${planName}\n`));
 
   if (!config.plans) config.plans = [];
 
   // Check if plan already exists
-  const existing = config.plans.findIndex((p: any) => p.name?.toLowerCase() === name.toLowerCase());
+  const existing = config.plans.findIndex((p: any) => p.name?.toLowerCase() === planName);
   if (existing >= 0) {
-    warn(`Plan "${name}" already exists — overwriting`);
+    warn(`Plan "${planName}" already exists — overwriting`);
     config.plans.splice(existing, 1);
   }
 
@@ -401,12 +474,12 @@ async function addPlanCommand(
     : [];
 
   const newPlan: Record<string, any> = {
-    name,
-    display_name: name.charAt(0).toUpperCase() + name.slice(1),
+    name: planName,
+    display_name: planName.charAt(0).toUpperCase() + planName.slice(1),
     price,
     interval: price === 0 ? undefined : 'month',
     stripe_price_id: '',
-    features: featuresList.length > 0 ? featuresList : [`Everything in the ${name} plan`],
+    features: featuresList.length > 0 ? featuresList : [`Everything in the ${planName} plan`],
     cta: price === 0 ? 'Get Started' : 'Start Free Trial',
   };
 
@@ -419,13 +492,13 @@ async function addPlanCommand(
   writeConfig(opts.config, config, !!opts.dryRun);
 
   if (!opts.dryRun) {
-    success(`Added plan "${name}" ($${price}/mo) to ${opts.config}`);
+    success(`Added plan "${planName}" ($${price}/mo) to ${opts.config}`);
   }
   if (opts.trial) info(`Trial: ${opts.trial} days`);
   if (featuresList.length > 0) info(`Features: ${featuresList.join(', ')}`);
   info(`Sync to Stripe: ${chalk.cyan('corral stripe push')}`);
 
-  if (jsonOutput({ name, price, features: featuresList, config: opts.config }, !!opts.json)) return;
+  if (jsonOutput({ name: planName, price, features: featuresList, config: opts.config }, !!opts.json)) return;
 }
 
 // ─── Command: add admin-page ──────────────────────────────────────────────────
@@ -699,6 +772,14 @@ export async function POST(req: NextRequest) {
         results.push(outputPath);
         success(`Created ${outputPath}`);
       }
+      // Install stripe package
+      try {
+        info('Installing stripe...');
+        execSync('npm install stripe', { stdio: 'pipe' });
+        success('Installed stripe');
+      } catch {
+        warn('Auto-install failed. Run: npm install stripe');
+      }
     } else {
       console.log(chalk.dim('\n── dry-run: would write to ' + outputPath + ' ──────────'));
       console.log(chalk.cyan(fileContent.slice(0, 600) + '\n…(truncated)'));
@@ -806,6 +887,14 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
         results.push(outputPath);
         success(`Created ${outputPath}`);
       }
+      // Install stripe package
+      try {
+        info('Installing stripe...');
+        execSync('npm install stripe', { stdio: 'pipe' });
+        success('Installed stripe');
+      } catch {
+        warn('Auto-install failed. Run: npm install stripe');
+      }
     } else {
       console.log(chalk.dim('\n── dry-run: would write to ' + outputPath + ' ──────────'));
       console.log(chalk.cyan(fileContent.slice(0, 600) + '\n…(truncated)'));
@@ -845,12 +934,17 @@ addCommand
   .command('page <path>')
   .description('Create a new page component (Next.js: app/<path>/page.tsx, SPA: src/pages/<Name>.tsx)')
   .option('--gated <plan>', 'Wrap page content in <PlanGate plan="...">')
+  .option('--gate <plan>', 'Alias for --gated')
+  .option('--plan <plan>', 'Alias for --gated (e.g. --plan pro)')
   .option('--name <name>', 'Override component name (default: derived from path)')
   .option('--dry-run', 'Preview changes without writing files')
   .option('--json', 'Output as JSON')
   .action(function (this: Command, pagePath: string, cmdOpts: OptionValues) {
     const parentOpts = this.parent?.parent?.opts() ?? {};
-    addPageCommand(pagePath, mergeOpts(parentOpts, cmdOpts)).catch(err => { error(err.message); process.exit(1); });
+    // Normalize --gate and --plan as aliases for --gated
+    const normalized = { ...cmdOpts };
+    if (!normalized.gated) normalized.gated = normalized.gate || normalized.plan;
+    addPageCommand(pagePath, mergeOpts(parentOpts, normalized)).catch(err => { error(err.message); process.exit(1); });
   });
 
 addCommand
@@ -868,8 +962,12 @@ addCommand
 addCommand
   .command('meter <name>')
   .description('Add a usage meter to corral.yaml')
-  .requiredOption('--limit <number>', 'Usage limit per period')
-  .requiredOption('--plan <plan>', 'Plan this limit applies to')
+  .option('--limit <number>', 'Usage limit per period (use with --plan)')
+  .option('--plan <plan>', 'Plan this limit applies to (use with --limit)')
+  .option('--free <number>', 'Limit for free plan')
+  .option('--pro <number>', 'Limit for pro plan')
+  .option('--team <number>', 'Limit for team plan')
+  .option('--enterprise <number>', 'Limit for enterprise plan')
   .option('--period <period>', 'Reset period: monthly or daily (default: monthly)', 'monthly')
   .option('--dry-run', 'Preview changes without writing files')
   .option('--json', 'Output as JSON')

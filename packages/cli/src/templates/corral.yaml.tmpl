@@ -61,13 +61,13 @@ auth:
 
 # ── Plans & Features ──────────────────────────────────────────────────
 plans:
-  - name: Free
+  - name: free
     display_name: "Free"
     price: 0
     features: ["Basic access"]
     cta: "Get Started"
 
-  - name: Pro
+  - name: pro
     display_name: "Pro"
     price: 29
     interval: month
@@ -75,7 +75,7 @@ plans:
     trial: true
     popular: true
     features:
-      - "Everything in Free"
+      - "Everything in free"
       - "Priority support"
     cta: "Start Free Trial"
 
@@ -84,8 +84,8 @@ plans:
 features:
   browse: ["*"]                # Anyone can browse
   save: ["authenticated"]      # Must be logged in
-  export: ["Free", "Pro"]      # Free tier and up
-  # advanced: ["Pro"]          # Pro only
+  export: ["free", "pro"]      # Free tier and up
+  # advanced: ["pro"]          # Pro only
 
 # ── Billing ────────────────────────────────────────────────────────────
 billing:
@@ -108,8 +108,8 @@ meters:
     type: cap
     reset_period: month
     limits:
-      Free: 100
-      Pro: 10000
+      free: 100
+      pro: 10000
     warning_at: 0.8
     nudge:
       message: "You've used {{percent}}% of your API calls"
@@ -125,11 +125,11 @@ seed:
     - email: "user@example.com"
       password: "test123"
       name: "Test User"
-      plan: Free
+      plan: free
     - email: "pro@example.com"
       password: "test123"
       name: "Pro User"
-      plan: Pro
+      plan: pro
 
 # ── Admin Dashboard ────────────────────────────────────────────────────
 admin:
