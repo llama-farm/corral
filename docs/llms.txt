@@ -390,6 +390,21 @@ These read the `session` + `user` tables directly. All auth writes go through th
 
 ---
 
+## Deploy
+
+Generate deployment configs for your platform:
+
+```bash
+corral deploy docker     # Dockerfile + docker-compose + nginx + supervisord
+corral deploy fly        # fly.toml + Dockerfile (--region iad)
+corral deploy railway    # railway.json + Dockerfile
+corral deploy render     # render.yaml + Dockerfile
+```
+
+Auto-detects backend language (Node/Python/Go/Rust/Ruby) and generates appropriate configs.
+
+---
+
 ## More
 
 - Full docs: https://docs.llamafarm.dev/corral/

@@ -188,7 +188,34 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     Built for OpenClaw, Claude Code, Codex, and Cursor
   </p>
 
-  <div class="hero-actions">
+  <!-- Copy-paste prompt box -->
+  <div class="hero-prompt" style="margin-top:28px;max-width:680px;margin-left:auto;margin-right:auto">
+    <p style="font-size:0.85rem;color:#a5b4fc;margin-bottom:10px;text-align:center">
+      📋 Copy this into your AI agent to get started:
+    </p>
+    <div class="hero-prompt-box" style="position:relative;background:rgba(15,17,23,0.8);border:1px solid rgba(99,102,241,0.4);border-radius:10px;padding:16px 20px;font-family:var(--font-mono);font-size:0.82rem;line-height:1.7;color:#c9d1d9;cursor:pointer" onclick="copyPrompt(this)">
+      <span style="position:absolute;top:8px;right:12px;font-size:0.7rem;color:#6366f1;opacity:0.8" class="copy-hint">click to copy</span>
+<span style="color:#86efac">Read: https://llama-farm.github.io/corral/llms.txt</span>
+
+<span style="color:#f9a8d4">Add auth and Stripe billing to my app.</span>
+<span style="color:#f9a8d4">Free tier + Pro at $29/mo with 14-day trial.</span>
+<span style="color:#f9a8d4">Wire up everything: login, signup, profile page,</span>
+<span style="color:#f9a8d4">admin dashboard, upgrade banners, and feature gating.</span>
+    </div>
+  </div>
+  <script>
+  function copyPrompt(el) {
+    var text = 'Read: https://llama-farm.github.io/corral/llms.txt\n\nAdd auth and Stripe billing to my app. Free tier + Pro at $29/mo with 14-day trial. Wire up everything: login, signup, profile page, admin dashboard, upgrade banners, and feature gating.';
+    navigator.clipboard.writeText(text).then(function() {
+      var hint = el.querySelector('.copy-hint');
+      hint.textContent = '✓ copied!';
+      hint.style.color = '#86efac';
+      setTimeout(function() { hint.textContent = 'click to copy'; hint.style.color = '#6366f1'; }, 2000);
+    });
+  }
+  </script>
+
+  <div class="hero-actions" style="margin-top:24px">
     <a href="agents.html" class="btn btn-primary">
       For Agents →
     </a>
@@ -673,7 +700,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     <div class="footer-left">
       <span>🦙 Corral</span>
       <span>MIT License</span>
-      <span>v0.1.0-alpha</span>
+      <span>v0.4.0</span>
     </div>
     <div class="footer-right">
       <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a>
