@@ -5,28 +5,31 @@
 >
 > Designed for: OpenClaw, Claude Code, Codex, Cursor, and any AI coding assistant.
 >
-> This is the extended reference with full examples. For the concise version: https://corralauth.dev/llms.txt
+> This is the extended reference with full examples. For the concise version: https://docs.llamafarm.dev/corral/llms.txt
 > GitHub: https://github.com/llama-farm/corral
-> Version: 0.1.0-alpha
+> npm: https://www.npmjs.com/package/create-corral
+> Version: 0.1.0
 
 ## Quick Start (for agents)
 
 > 1. Run: `npx create-corral init` (in the project directory)
 > 2. Edit `corral.yaml` with the user's desired plans, features, and auth providers
-> 3. Run: `npx create-corral validate`
+> 3. Run: `npx create-corral doctor`
 > That's it. The app now has auth + payments.
 
-Full 9-command workflow:
+Full 9-command workflow (all commands use `npx create-corral <command>`):
 
-1. `corral analyze --json`                    — detect framework/database (read-only)
-2. `corral init --yes --json`                 — scaffold all files (idempotent)
-3. `corral add provider google --json`        — add OAuth provider
-4. `corral add plan pro --price 29 --json`    — add paid plan
-5. `corral add feature X --plans pro --gate blur --json`
-6. `corral add meter api_calls --free 500 --pro 10000 --overage block --json`
-7. `corral stripe push --json`                — sync to Stripe
-8. `corral validate --strict --json`          — verify everything (exit 0 = deploy-ready)
-9. `corral seed --count 3 --json`             — create test users
+```bash
+npx create-corral analyze --json              # 1. detect framework/database
+npx create-corral init                        # 2. scaffold all files + install deps
+npx create-corral add provider google         # 3. add OAuth provider
+npx create-corral add plan pro --price 29 --trial 14  # 4. add paid plan
+npx create-corral add feature ai_tools --plan pro     # 5. gate a feature
+npx create-corral add meter api_calls --free 500 --pro 10000  # 6. usage meter
+npx create-corral add page dashboard --gated pro      # 7. gated page
+npx create-corral add device-verify           # 8. CLI auth page
+npx create-corral doctor                      # 9. verify everything
+```
 
 All commands output `--json` with a standard envelope:
 - Success: `{ "status": "ok", "result": {...}, "next_steps": [...] }`
