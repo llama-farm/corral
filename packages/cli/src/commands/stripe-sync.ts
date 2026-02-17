@@ -46,7 +46,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
 
     try {
       // 1. Find or create product by metadata
-      let product: any;
+      let product: { id: string; name?: string; [k: string]: any };
       const existingProducts = await stripe.products.search({
         query: `metadata["corral_plan_id"]:"${key}"`,
       });
@@ -71,7 +71,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
       const amountCents = Math.round(plan.price * 100);
       const interval = 'month'; // Default to monthly
 
-      let priceId = plan.stripe_price_id;
+      let priceId: string = plan.stripe_price_id || '';
       if (priceId) {
         // Verify existing price is still valid
         try {
@@ -88,7 +88,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
 
       // Search for matching active price
       const existingPrices = await stripe.prices.list({
-        product: product.id,
+        product: product.id!,
         active: true,
         limit: 100,
       });
@@ -103,7 +103,7 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
         results.push({ plan: key, action: 'found', priceId });
       } else {
         const newPrice = await stripe.prices.create({
-          product: product.id,
+          product: product.id!,
           unit_amount: amountCents,
           currency: 'usd',
           recurring: { interval },
