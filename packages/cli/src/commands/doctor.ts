@@ -176,24 +176,16 @@ export async function doctorCommand(opts: { json?: boolean; config: string; url?
   }
 
   // ─── 6e. Express route wildcard check ─────────────────────────────
-  // Express 4 uses /*, Express 5 uses /*splat — template auto-detects
+  // /api/auth/* works in BOTH Express 4 and 5. /*splat is Express 5-only and breaks 4.
   if (foundRoute && (foundRoute.startsWith('server/') || foundRoute.includes('express'))) {
     const routeContent = readFileSync(foundRoute, 'utf-8');
-    const expressVersion = deps['express'] ? parseInt(deps['express'].replace(/[^0-9]/g, '')[0] || '4') : 4;
-    if (expressVersion >= 5 && routeContent.includes('"/api/auth/*"') && !routeContent.includes('/*splat') && !routeContent.includes('try')) {
+    if (routeContent.includes('/*splat') && !routeContent.includes('/*"')) {
       checks.push({
         name: 'Express route wildcard',
-        status: 'warn',
-        detail: 'Express 5 requires named wildcards (*splat). Update route or re-run corral init.'
+        status: 'fail',
+        detail: 'Route uses /*splat which breaks Express 4. Change to /* (works in both v4 and v5).'
       });
-      warn('Express 5 detected — route may need /*splat instead of /*');
-    } else if (expressVersion < 5 && routeContent.includes('/*splat') && !routeContent.includes('try')) {
-      checks.push({
-        name: 'Express route wildcard',
-        status: 'warn',
-        detail: 'Express 4 uses bare wildcard (*). Remove "splat" from route.'
-      });
-      warn('Express 4 detected — route uses /*splat (needs /*)');
+      error('Route uses /*splat — change to /* (works in both Express 4 and 5)');
     }
   }
 

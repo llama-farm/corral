@@ -22,14 +22,10 @@ app.use(cors({
 }));
 
 // Mount Better Auth on /api/auth/*
-// Express 5 requires named wildcards (*splat), Express 4 uses bare (*)
-// Auto-detect: try Express 5 syntax first, fall back to Express 4
+// IMPORTANT: Express 4 uses /api/auth/*, Express 5 uses /api/auth/*splat
+// Using Express 4 syntax (works with both when placed before other routes)
 const authHandler = toNodeHandler(auth);
-try {
-  app.all("/api/auth/*splat", (req, res) => authHandler(req, res));
-} catch {
-  app.all("/api/auth/*", (req, res) => authHandler(req, res));
-}
+app.all("/api/auth/*", (req, res) => authHandler(req, res));
 
 // Health check
 app.get("/health", (_req, res) => res.json({ ok: true }));

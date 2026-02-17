@@ -80,7 +80,7 @@ app.use(express.json());
 // ─── Better Auth ───────────────────────────────────────────────────
 const authHandler = toNodeHandler(auth);
 try {
-  app.all("/api/auth/*splat", (req, res) => authHandler(req, res));
+  app.all("/api/auth/*", (req, res) => authHandler(req, res));
 } catch {
   app.all("/api/auth/*", (req, res) => authHandler(req, res));
 }
