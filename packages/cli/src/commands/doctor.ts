@@ -151,7 +151,9 @@ export async function doctorCommand(opts: { json?: boolean; config: string; url?
   // LEARNING #1: { db, type } format causes "selectFrom is not a function"
   if (foundSetup) {
     const setupContent = readFileSync(foundSetup, 'utf-8');
-    if (setupContent.includes('type: "sqlite"') || setupContent.includes("type: 'sqlite'")) {
+    // Strip comments before checking — comments with examples can cause false positives
+    const setupNoComments = setupContent.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    if (setupNoComments.includes('type: "sqlite"') || setupNoComments.includes("type: 'sqlite'")) {
       checks.push({
         name: 'Database adapter format',
         status: 'fail',
