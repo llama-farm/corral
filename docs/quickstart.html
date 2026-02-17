@@ -92,7 +92,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     <!-- ── Step 1 ───────────────────────────────────────── -->
     <h2>Step 1 — Initialize Corral</h2>
     <p>
-      Run <code>npx corral init</code> in your project root. The CLI analyzes your
+      Start with <code>npm create corral@latest</code>, then run <code>corral init</code> in your project root. The CLI analyzes your
       project structure, detects your framework and database, and scaffolds everything.
     </p>
 
@@ -104,7 +104,11 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
         <span class="terminal-title">~/projects/horizon</span>
       </div>
       <div class="terminal-body">
-        <span class="terminal-line cmd">npx corral init</span>
+        <span class="terminal-line cmd">npm create corral@latest</span>
+        <span class="terminal-line output">? What do you want to do? <span style="color:#c9d1d9">Initialize Corral in an existing app</span></span>
+        <span class="terminal-line output">? Project path: <span style="color:#c9d1d9">.</span></span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">corral init</span>
         <span class="terminal-line info">Analyzing project structure…</span>
         <span class="terminal-line info">Detected: Next.js 14.2, TypeScript, PostgreSQL (Prisma)</span>
         <span class="terminal-line blank"></span>
@@ -125,7 +129,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
         <span class="terminal-line success">Created  CORRAL.md</span>
         <span class="terminal-line blank"></span>
         <span class="terminal-line info">Added to .env.local: CORRAL_SECRET, STRIPE_SECRET_KEY (placeholder)</span>
-        <span class="terminal-line info">Run: npm install @corral/core @corral/next</span>
+        <span class="terminal-line info">Feature showcase: auth, billing, gates, admin UI, llms.txt, and agent checklist ready</span>
         <span class="terminal-line blank"></span>
         <span class="terminal-line success">Done in 1.2s. Next: edit corral.yaml, then npm run dev.</span>
       </div>
@@ -135,6 +139,27 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     <div class="code-block">
       <div class="code-block-header"><span class="code-lang">bash</span></div>
       <pre><code>npm install @corral/core @corral/next</code></pre>
+    </div>
+
+
+    <h3>What detection looks like (v0.4.1)</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">text</span></div>
+      <pre><code>Detected framework: Next.js (App Router)
+Detected database: PostgreSQL
+Detected package manager: npm
+Detected monorepo: no
+Generated: auth routes, billing routes, AdminPanel, ProfilePage, AccountMenu, gates.tsx, auth-context.tsx, CORRAL.md, .corral/agent-checklist.json, llms-agent-prompt.md</code></pre>
+    </div>
+
+    <h3>Copy-paste prompt for your coding agent</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">prompt</span></div>
+      <pre><code>Add Corral auth + billing to this app using v0.4.1 defaults.
+Run: npm create corral@latest, then corral init.
+Plans: free, pro ($49/mo, 14-day trial), enterprise (custom).
+Gate ai_analysis to pro+ with blur preview for free users.
+After changes run: corral validate --json and corral doctor --json.</code></pre>
     </div>
 
     <!-- ── Step 2 ───────────────────────────────────────── -->

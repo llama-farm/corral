@@ -73,10 +73,10 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     </p>
 
     <div class="callout info">
-      <div class="callout-title">Stripe not required</div>
-      Billing is optional. If you only need free-plan gating or role-based access,
-      skip Stripe entirely. Add it later with <code>corral add plan pro --price 49</code>
-      followed by <code>corral stripe push</code>.
+      <div class="callout-title">Billing in v0.4.1</div>
+      Use <code>corral stripe sync</code> (alias: <code>corral stripe push</code>) to sync products/prices,
+      register webhooks, and power checkout + billing portal endpoints.
+      Corral supports usage metering and free trials out of the box.
     </div>
 
     <!-- ── Plan Config ─────────────────────────────── -->

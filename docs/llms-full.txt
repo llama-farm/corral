@@ -8,7 +8,7 @@
 > This is the extended reference with full examples. For the concise version: https://docs.llamafarm.dev/corral/llms.txt
 > GitHub: https://github.com/llama-farm/corral
 > npm: https://www.npmjs.com/package/create-corral
-> Version: 0.1.0
+> Version: 0.4.1
 
 ## Quick Start (for agents)
 
@@ -847,7 +847,7 @@ The generated CORRAL.md follows this structure (for agent consumption):
 ```markdown
 # Corral in [AppName]
 
-Corral v0.1.0 · [Framework] · [Database]
+Corral v0.4.1 · [Framework] · [Database]
 
 ## Auth Routes
 

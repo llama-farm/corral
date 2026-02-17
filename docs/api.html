@@ -108,6 +108,14 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
       Billing endpoints: <code>/api/billing/*</code>
     </div>
 
+    <h3>Endpoint Index (v0.4.1)</h3>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">text</span></div><pre><code>Auth: /session, /sign-up/email, /sign-in/email, /sign-in/social, /sign-out, /verify-email,
+      /forgot-password, /reset-password, /magic-link, /otp/send, /otp/verify,
+      /device/authorize, /device/token, /device/verify, /keys, /keys/:id
+Billing: /checkout, /portal, /cancel, /reactivate, /webhook,
+         /usage/track, /usage/:meter, /plans, /subscription
+Admin: /admin/users, /admin/users/:id/promote, /admin/users/:id/plan</code></pre></div>
+
     <h3>Authentication</h3>
     <p>
       Most endpoints require authentication. Pass credentials using:

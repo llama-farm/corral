@@ -11,7 +11,7 @@
 > GitHub: https://github.com/llama-farm/corral
 > npm: https://www.npmjs.com/package/create-corral
 > Docs: https://docs.llamafarm.dev/corral/
-> Version: 0.1.0
+> Version: 0.4.1
 
 ---
 

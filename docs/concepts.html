@@ -78,6 +78,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
 
   <main class="docs-content">
     <h1>Core Concepts</h1>
+    <div class="callout info"><div class="callout-title">Version</div>This page reflects Corral v0.4.1 (agent-native auth + billing CLI).</div>
     <p class="docs-lead">
       Corral is built on a small set of composable primitives.
       Understand these and the entire system becomes predictable.
@@ -360,7 +361,7 @@ console.<span class="tok-cmd">log</span>(<span class="tok-string">'Authenticated
         <div class="hierarchy-badge" style="width:80px;text-align:center"><span class="badge" style="background:rgba(59,130,246,0.2);color:#93c5fd">Admin</span></div>
         <div>
           <div class="hierarchy-label">Admin role</div>
-          <div class="hierarchy-desc">Role-based, not plan-based. Can access <code>roles: [admin]</code> features regardless of plan. Set via <code>corral promote &lt;email&gt; admin</code>.</div>
+          <div class="hierarchy-desc">Role-based, not plan-based. Can access <code>roles: [admin]</code> features regardless of plan. Set via <code>corral users set-plan</code> / admin role management in generated AdminPanel.</div>
         </div>
       </div>
     </div>

@@ -56,7 +56,12 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
         <li><a href="#seed">seed</a></li>
         <li><a href="#dev">dev</a></li>
         <li><a href="#llms-txt">llms-txt</a></li>
-        <li><a href="#promote">promote</a></li>
+        <li><a href="#deploy">deploy</a></li>
+        <li><a href="#verify">verify</a></li>
+        <li><a href="#test">test</a></li>
+        <li><a href="#config">config</a></li>
+        <li><a href="#users">users</a></li>
+        <li><a href="#backup">backup</a></li>
       </ul>
     </div>
     <div class="sidebar-section">
@@ -84,8 +89,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
 
     <div class="callout info">
       <div class="callout-title">Installation</div>
-      The CLI is available via <code>npx corral &lt;command&gt;</code> (no install needed)
-      or globally with <code>npm install -g @corral/cli</code>.
+      Use <code>npm create corral@latest</code> to install/run the latest scaffolder and then run <code>corral &lt;command&gt;</code> inside your project. All commands support <code>--json</code>.
     </div>
 
     <!-- ── Global Flags ──────────────────────────────── -->
@@ -105,6 +109,26 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
         </tbody>
       </table>
     </div>
+
+
+    <h2 id="command-catalog">Command Catalog (18 commands in v0.4.1)</h2>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral init
+corral add feature|plan|provider|meter
+corral doctor
+corral stripe sync   # alias: corral stripe push
+corral deploy docker|fly|railway|render
+corral dev
+corral seed
+corral test
+corral validate
+corral config validate|edit|set|diff
+corral users list|create|set-plan
+corral backup now|list|restore
+corral status
+corral analyze
+corral verify
+corral llms-txt
+corral rollback</code></pre></div>
 
     <!-- ── init ─────────────────────────────────────── -->
     <h2 id="init">init</h2>
@@ -340,7 +364,7 @@ Options:
 
 # Output:
 # ✓ corral.yaml valid
-# ✓ @corral/core v0.1.0 matches CLI v0.1.0
+# ✓ @corral/core v0.4.1 matches CLI v0.4.1
 # ✓ Database connection OK
 # ✓ Google OAuth: client_id set, callback URL registered
 # ✗ SMTP: connection refused at smtp.example.com:587
@@ -475,6 +499,38 @@ corral dev --port 3001 --watch
 # llms.txt: http://localhost:3001/api/llms.txt</code></pre>
     </div>
 
+
+    <h2 id="deploy">deploy</h2>
+    <p>Generate deployment config for supported targets.</p>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral deploy docker
+corral deploy fly
+corral deploy railway
+corral deploy render</code></pre></div>
+
+    <h2 id="verify">verify</h2>
+    <p>Verify that generated auth + billing endpoints are reachable and correctly wired.</p>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral verify --json</code></pre></div>
+
+    <h2 id="test">test</h2>
+    <p>Run auth smoke tests for signup/signin/session/gating flows.</p>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral test --json</code></pre></div>
+
+    <h2 id="config">config</h2>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral config validate
+corral config edit
+corral config set app.url https://example.com
+corral config diff</code></pre></div>
+
+    <h2 id="users">users</h2>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral users list
+corral users create --email dev@example.com --plan free
+corral users set-plan --email dev@example.com --plan pro</code></pre></div>
+
+    <h2 id="backup">backup</h2>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral backup now
+corral backup list
+corral backup restore --id bkp_2026_02_17</code></pre></div>
+
     <!-- ── llms-txt ──────────────────────────────────── -->
     <h2 id="llms-txt">llms-txt</h2>
     <p>
@@ -497,22 +553,6 @@ corral llms-txt --full --output llms-full.txt
 corral llms-txt --update               # refresh CORRAL.md</code></pre>
     </div>
 
-    <!-- ── promote ──────────────────────────────────── -->
-    <h2 id="promote">promote</h2>
-    <p>Promote a user to admin role or change their plan.</p>
-    <div class="code-block">
-      <div class="code-block-header"><span class="code-lang">bash</span></div>
-      <pre><code>corral promote &lt;email&gt; &lt;role|plan&gt; [options]
-
-# Examples:
-corral promote alice@horizon.mil admin
-corral promote bob@horizon.mil pro
-corral promote carol@horizon.mil enterprise --no-stripe  <span class="tok-comment"># skip Stripe subscription</span>
-
-# With --json:
-corral promote alice@horizon.mil admin --json
-# { "status": "ok", "user": { "id": "usr_...", "email": "alice@...", "role": "admin" } }</code></pre>
-    </div>
 
     <div class="docs-footer">
       <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>

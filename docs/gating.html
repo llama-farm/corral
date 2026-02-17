@@ -74,6 +74,12 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
       session — no extra API calls needed.
     </p>
 
+    <div class="callout tip">
+      <div class="callout-title">Generated gating components (v0.4.1)</div>
+      <code>gates.tsx</code> includes <code>AuthGate</code>, <code>PlanGate</code>, <code>FeatureGate</code>, <code>BlurGate</code>, <code>PageGate</code>, and <code>SkeletonPage</code>.
+      All gates support admin bypass by default.
+    </div>
+
     <div class="callout info">
       <div class="callout-title">Gate modes are set in corral.yaml</div>
       The visual behavior (blur, skeleton, block, hide) is configured per-feature

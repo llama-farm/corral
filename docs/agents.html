@@ -169,8 +169,9 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     <div class="callout info">
       <div class="callout-title">TL;DR for agents</div>
       Read <a href="llms.txt">llms.txt</a> or <a href="llms-full.txt">llms-full.txt</a>, run
-      <code>npx create-corral init</code>, edit <code>corral.yaml</code>, run
-      <code>npx create-corral validate</code>. Done. The app has auth + payments.
+      <code>npm create corral@latest
+then corral init</code>, edit <code>corral.yaml</code>, run
+      <code>corral validate</code>. Done. The app has auth + payments.
     </div>
 
     <!-- ── Overview ─────────────────────────────────── -->
@@ -209,7 +210,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     </p>
     <div class="code-block">
       <div class="code-block-header"><span class="code-lang">prompt</span></div>
-      <pre><code>Read: https://corral.llamafarm.dev/llm.txt
+      <pre><code>Read: https://corral.llamafarm.dev/llms.txt
 Then add auth and Stripe billing to this app.
 Free tier and Pro at $29/mo. Use Google login.</code></pre>
     </div>
@@ -220,12 +221,13 @@ Free tier and Pro at $29/mo. Use Google login.</code></pre>
       <pre><code>## Auth + Payments
 
 This project uses Corral for auth, Stripe billing, and feature gating.
-Corral spec: https://corral.llamafarm.dev/llm.txt
+Corral spec: https://corral.llamafarm.dev/llms.txt
 Full reference: llms-full.txt
 
 When asked to add auth or payments:
 1. Read CORRAL.md (if it exists) for project-specific context
-2. Otherwise, run: npx create-corral init
+2. Otherwise, run: npm create corral@latest
+then corral init
 3. Edit corral.yaml with the requested plans/features
 4. Run: corral validate --json</code></pre>
     </div>
@@ -236,7 +238,7 @@ When asked to add auth or payments:
       <pre><code>## Auth + Payments (Corral)
 
 This project uses Corral for auth + Stripe billing.
-Read: https://corral.llamafarm.dev/llm.txt for the full spec.
+Read: https://corral.llamafarm.dev/llms.txt for the full spec.
 
 - All auth/billing config lives in corral.yaml
 - To add a feature gate: corral add feature &lt;name&gt; --plans &lt;list&gt; --gate &lt;mode&gt;
@@ -260,6 +262,13 @@ openclaw skill add corral
 <span class="tok-comment"># "Add Google auth and a $29/mo Pro plan with AI features gated"</span></code></pre>
     </div>
 
+
+    <h2 id="copy-paste-prompts">Copy-paste prompts and agent files</h2>
+    <ul>
+      <li><strong>Homepage prompts:</strong> use the copy-paste starter prompts from the homepage/quickstart to instruct any coding agent.</li>
+      <li><strong><code>llms-agent-prompt.md</code>:</strong> generated template with project-specific instructions after <code>corral init</code>.</li>
+      <li><strong><code>.corral/agent-checklist.json</code>:</strong> machine-readable completion checklist consumed by <code>corral doctor</code>.</li>
+    </ul>
     <!-- ── Supported Agents ──────────────────────────── -->
     <h2 id="supported-agents">Supported Agents</h2>
     <p>
@@ -291,9 +300,9 @@ openclaw skill add corral
         <p>Point it at llms.txt and it handles everything. Best results with AGENTS.md context.</p>
         <h4>Setup</h4>
         <div class="context-box"># Add to AGENTS.md:
-Corral spec: https://corral.llamafarm.dev/llm.txt</div>
+Corral spec: https://corral.llamafarm.dev/llms.txt</div>
         <h4>Or in your prompt</h4>
-        <div class="context-box">Read: https://corral.llamafarm.dev/llm.txt then add auth + billing.</div>
+        <div class="context-box">Read: https://corral.llamafarm.dev/llms.txt then add auth + billing.</div>
       </div>
     </div>
 
@@ -322,7 +331,7 @@ Always use --json flag on corral commands.</div>
         <p>Add to <code>.cursorrules</code> for persistent context in every Cursor session on this project.</p>
         <h4>Setup</h4>
         <div class="context-box"># .cursorrules
-Auth + payments: Corral. Read: https://corral.llamafarm.dev/llm.txt
+Auth + payments: Corral. Read: https://corral.llamafarm.dev/llms.txt
 Config: corral.yaml | Validate: corral validate --json</div>
       </div>
     </div>
@@ -338,7 +347,7 @@ Config: corral.yaml | Validate: corral validate --json</div>
         <h4>Setup</h4>
         <div class="context-box"># Project rules / system prompt:
 This project uses Corral for auth + billing.
-Spec: https://corral.llamafarm.dev/llm.txt</div>
+Spec: https://corral.llamafarm.dev/llms.txt</div>
       </div>
     </div>
 
@@ -351,7 +360,7 @@ Spec: https://corral.llamafarm.dev/llm.txt</div>
       <div class="agent-row-body">
         <p>Use <code>/read</code> to add llms.txt or llms-full.txt to Aider's context. Include CORRAL.md after init.</p>
         <h4>Setup</h4>
-        <div class="context-box">/read https://corral.llamafarm.dev/llm.txt
+        <div class="context-box">/read https://corral.llamafarm.dev/llms.txt
 /read CORRAL.md  # after corral init</div>
       </div>
     </div>
@@ -363,7 +372,7 @@ Spec: https://corral.llamafarm.dev/llm.txt</div>
         <div class="agent-row-tag">Supported</div>
       </div>
       <div class="agent-row-body">
-        <p>If it can run CLI commands and read markdown, it can use Corral. Just provide the full URL, e.g. https://corral.llamafarm.dev/llm.txt.</p>
+        <p>If it can run CLI commands and read markdown, it can use Corral. Just provide the full URL, e.g. https://corral.llamafarm.dev/llms.txt.</p>
         <h4>Universal setup</h4>
         <div class="context-box">Read llms-full.txt for the Corral spec.
 All CLI commands support --json. Exit 0 = success, 1 = error.</div>
@@ -503,7 +512,7 @@ Sync to Stripe after. Show me the Stripe product IDs.</code></pre>
       <div class="code-block-header"><span class="code-filename">CORRAL.md — example for a Next.js app</span><span class="code-lang">markdown</span></div>
       <pre><code># Corral in MySaaSApp
 
-Corral v0.1.0 · Next.js 14 (App Router) · PostgreSQL (Prisma)
+Corral v0.4.1 · Next.js 14 (App Router) · PostgreSQL (Prisma)
 
 ## Auth Routes
 

@@ -42,6 +42,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
         <li><a href="#docker">Docker</a></li>
         <li><a href="#railway">Railway</a></li>
         <li><a href="#fly-io">Fly.io</a></li>
+        <li><a href="#render">Render</a></li>
         <li><a href="#vercel">Vercel</a></li>
         <li><a href="#docker-compose">Docker Compose</a></li>
         <li><a href="#multi-language">Multi-Language</a></li>
@@ -79,6 +80,15 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
       Deploy Corral with any stack — Docker, Railway, Fly.io, Vercel, or bare VMs.
       The auth server runs as a lightweight sidecar: internal only, never exposed to the internet.
     </p>
+    <div class="callout info">
+      <div class="callout-title">CLI-first deploy flow (v0.4.1)</div>
+      Generate platform configs with <code>corral deploy docker|fly|railway|render</code>, then deploy with your platform CLI.
+    </div>
+    <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div><pre><code>corral deploy docker
+corral deploy fly
+corral deploy railway
+corral deploy render</code></pre></div>
+
 
     <!-- ── The Principle ───────────────────────────────────────── -->
     <h2 id="the-principle">The "Nobody Sees Node" Principle</h2>
