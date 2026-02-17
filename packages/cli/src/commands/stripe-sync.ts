@@ -22,14 +22,30 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
 
   let Stripe: any;
   try {
-    Stripe = require('stripe');
+    const { createRequire } = await import('module');
+    const req = createRequire(process.cwd() + '/package.json');
+    Stripe = req('stripe');
   } catch {
-    logError('stripe package not installed. Run: npm install stripe');
-    return;
+    try {
+      Stripe = (await import('stripe')).default;
+    } catch {
+      logError('stripe package not installed. Run: npm install stripe');
+      return;
+    }
   }
 
   const stripe = Stripe(stripeKey);
-  const plans = config.billing?.plans || {};
+  // Support both top-level plans array and billing.plans record
+  let plans: Record<string, any> = {};
+  if (Array.isArray(rawConfig.plans)) {
+    for (const p of rawConfig.plans) {
+      if (p.name) plans[p.name] = p;
+    }
+  } else if (config.billing?.plans && typeof config.billing.plans === 'object') {
+    plans = config.billing.plans;
+  } else if (rawConfig.billing?.plans && typeof rawConfig.billing.plans === 'object') {
+    plans = rawConfig.billing.plans;
+  }
   const results: { plan: string; action: string; priceId: string }[] = [];
 
   if (!opts.json) {
@@ -54,14 +70,15 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
       if (existingProducts.data.length > 0) {
         product = existingProducts.data[0];
         // Update name if changed
-        if (product.name !== plan.name) {
-          const updated = await stripe.products.update(product.id, { name: plan.name });
+        const displayName = plan.display_name || plan.name;
+        if (product.name !== displayName) {
+          const updated = await stripe.products.update(product.id, { name: displayName });
           product = updated;
         }
         if (spinner) spinner.text = `Found product: ${product.id}`;
       } else {
         product = await stripe.products.create({
-          name: plan.name,
+          name: plan.display_name || plan.name,
           metadata: { corral_plan_id: key },
         });
         if (spinner) spinner.text = `Created product: ${product.id}`;
@@ -113,11 +130,16 @@ export async function stripeSyncCommand(opts: { json?: boolean; config: string; 
         results.push({ plan: key, action: 'created', priceId });
       }
 
-      // 3. Write back to config
-      if (!rawConfig.billing) rawConfig.billing = {};
-      if (!rawConfig.billing.plans) rawConfig.billing.plans = {};
-      if (!rawConfig.billing.plans[key]) rawConfig.billing.plans[key] = {};
-      rawConfig.billing.plans[key].stripe_price_id = priceId;
+      // 3. Write back to config (support both array and record format)
+      if (Array.isArray(rawConfig.plans)) {
+        const planEntry = rawConfig.plans.find((p: any) => p.name === key);
+        if (planEntry) planEntry.stripe_price_id = priceId;
+      } else {
+        if (!rawConfig.billing) rawConfig.billing = {};
+        if (!rawConfig.billing.plans) rawConfig.billing.plans = {};
+        if (!rawConfig.billing.plans[key]) rawConfig.billing.plans[key] = {};
+        rawConfig.billing.plans[key].stripe_price_id = priceId;
+      }
 
     } catch (e: any) {
       spinner?.fail(`${key}: ${e.message}`);

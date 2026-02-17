@@ -11,8 +11,22 @@ const PlanSchema = z.object({
 });
 
 const MeterSchema = z.object({
-  name: z.string(),
-  event: z.string(),
+  label: z.string().optional(),
+  unit: z.string().optional(),
+  type: z.string().optional(),
+  reset_period: z.string().optional(),
+  limits: z.record(z.number()).optional(),
+  warning_at: z.number().optional(),
+  nudge: z.object({
+    message: z.string().optional(),
+    cta: z.string().optional(),
+    trigger: z.string().optional(),
+  }).optional(),
+  icon: z.string().optional(),
+  stripe_meter: z.string().optional(),
+  // Legacy fields
+  name: z.string().optional(),
+  event: z.string().optional(),
   plan: z.string().optional(),
   limit: z.number().optional(),
   stripe_meter_id: z.string().optional(),
