@@ -117,10 +117,10 @@ All commands accept `--json` and `--help`. Use `npx create-corral <command>`.
 ### Add capabilities (all idempotent)
 - `add page <path> [--gated <plan>]`     — create a page (--gate also works)
 - `add feature <name> --plan <plan>`     — gate a feature to plan(s) (comma-separated)
-- `add meter <name> --limit <n> --plan <p>` — add usage meter for one plan
-- `add meter <name> --free <n> --pro <n> --team <n>` — set all plan limits at once
+- `add meter <name> --limit <n> --plan <p>` — add usage meter for any plan name (repeat for each plan)
+- `add meter <name> --free <n> --pro <n> --team <n>` — shorthand for common plan names
 - `add provider <name>`                  — add OAuth provider (google, github, etc.)
-- `add plan <name> --price <n> [--trial <days>] [--features <list>]`
+- `add plan <name> --price <n> [--trial <days>] [--features <list>] [--cta <text>]`
 - `add webhook`                          — generate Stripe webhook handler
 - `add device-verify`                    — generate CLI device auth page
 - `add admin-page`                       — generate admin dashboard page

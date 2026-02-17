@@ -56,7 +56,7 @@ export function BlurGate({
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
-  const userRank = PLAN_RANK[user?.plan || "free"] ?? 0;
+  const userRank = PLAN_RANK[user?.plan || ""] ?? 0;
   const requiredRank = PLAN_RANK[plan] ?? 1;
   const locked = !user || userRank < requiredRank;
 

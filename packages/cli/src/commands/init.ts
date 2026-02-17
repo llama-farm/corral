@@ -131,6 +131,54 @@ function replaceVars(tmpl: string, vars: Record<string, string>): string {
  * Next.js app is in a subdirectory, .env in the parent won't be read.
  * We write to BOTH .env and .env.local to cover all cases.
  */
+/**
+ * Ensure tsconfig.json has @/* path alias so generated imports resolve.
+ * Corral generates imports like `@/auth-context`, `@/gates`, `@/lib/corral`.
+ */
+function patchTsconfigPaths(): void {
+  const tsconfigFiles = ['tsconfig.json', 'tsconfig.app.json'];
+  for (const file of tsconfigFiles) {
+    if (!existsSync(file)) continue;
+    try {
+      const raw = readFileSync(file, 'utf-8');
+      // Strip comments for JSON parsing (// and /* */ style)
+      const stripped = raw
+        .replace(/\/\/.*$/gm, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/,\s*([}\]])/g, '$1'); // trailing commas
+      const tsconfig = JSON.parse(stripped);
+
+      if (!tsconfig.compilerOptions) tsconfig.compilerOptions = {};
+      const co = tsconfig.compilerOptions;
+
+      // Check if @/* already mapped
+      if (co.paths && co.paths['@/*']) continue;
+
+      // Determine base — use existing baseUrl or default to "."
+      if (!co.baseUrl) co.baseUrl = '.';
+      if (!co.paths) co.paths = {};
+
+      // Map @/* to src/* if src/ exists, otherwise ./*
+      const srcDir = existsSync('src') ? 'src' : '.';
+      co.paths['@/*'] = [`${srcDir}/*`];
+
+      // Write back — preserve original formatting where possible
+      // Re-read original to do surgical insert if feasible
+      if (raw.includes('"compilerOptions"') && raw.includes('"paths"')) {
+        // paths key exists but without @/* — just rewrite
+        writeFileSync(file, JSON.stringify(tsconfig, null, 2) + '\n');
+      } else {
+        writeFileSync(file, JSON.stringify(tsconfig, null, 2) + '\n');
+      }
+      success(`Patched ${file} — added @/* path alias → ${srcDir}/*`);
+      return; // only patch one tsconfig
+    } catch (e) {
+      // Non-fatal — some tsconfigs may be too complex to parse
+      warn(`Could not auto-patch ${file} with @/* path alias`);
+    }
+  }
+}
+
 function ensureEnvVars(port: number, framework: string): string[] {
   const additions: string[] = [];
 
@@ -822,6 +870,9 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
       success(`Created ${setupPath} (${db})`);
     }
   }
+
+  // Step 4b: Ensure tsconfig.json has @/* path alias (LEARNING from blind test)
+  patchTsconfigPaths();
 
   // Step 5: Environment variables (LEARNING #3 + .env.local for Next.js)
   const envAdded = ensureEnvVars(authServerPort, framework.name);

@@ -209,7 +209,7 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     </p>
     <div class="code-block">
       <div class="code-block-header"><span class="code-lang">prompt</span></div>
-      <pre><code>Read https://corralauth.dev/llms.txt then add auth and Stripe billing to this app.
+      <pre><code>Read llms.txt then add auth and Stripe billing to this app.
 Free tier and Pro at $29/mo. Use Google login.</code></pre>
     </div>
 
@@ -219,8 +219,8 @@ Free tier and Pro at $29/mo. Use Google login.</code></pre>
       <pre><code>## Auth + Payments
 
 This project uses Corral for auth, Stripe billing, and feature gating.
-Corral spec: https://corralauth.dev/llms.txt
-Full reference: https://corralauth.dev/llms-full.txt
+Corral spec: llms.txt
+Full reference: llms-full.txt
 
 When asked to add auth or payments:
 1. Read CORRAL.md (if it exists) for project-specific context
@@ -235,7 +235,7 @@ When asked to add auth or payments:
       <pre><code>## Auth + Payments (Corral)
 
 This project uses Corral for auth + Stripe billing.
-Read https://corralauth.dev/llms.txt for the full spec.
+Read llms.txt for the full spec.
 
 - All auth/billing config lives in corral.yaml
 - To add a feature gate: corral add feature &lt;name&gt; --plans &lt;list&gt; --gate &lt;mode&gt;
@@ -290,9 +290,9 @@ openclaw skill add corral
         <p>Point it at llms.txt and it handles everything. Best results with AGENTS.md context.</p>
         <h4>Setup</h4>
         <div class="context-box"># Add to AGENTS.md:
-Corral spec: https://corralauth.dev/llms.txt</div>
+Corral spec: llms.txt</div>
         <h4>Or in your prompt</h4>
-        <div class="context-box">Read https://corralauth.dev/llms.txt then add auth + billing.</div>
+        <div class="context-box">Read llms.txt then add auth + billing.</div>
       </div>
     </div>
 
@@ -306,7 +306,7 @@ Corral spec: https://corralauth.dev/llms.txt</div>
         <p>The <code>--json</code> flag on every command makes Codex integration seamless. No output parsing.</p>
         <h4>Setup</h4>
         <div class="context-box"># Add to AGENTS.md or pass in system prompt:
-Auth/payments: use Corral (https://corralauth.dev/llms.txt)
+Auth/payments: use Corral (llms.txt)
 Always use --json flag on corral commands.</div>
       </div>
     </div>
@@ -321,7 +321,7 @@ Always use --json flag on corral commands.</div>
         <p>Add to <code>.cursorrules</code> for persistent context in every Cursor session on this project.</p>
         <h4>Setup</h4>
         <div class="context-box"># .cursorrules
-Auth + payments: Corral. Read https://corralauth.dev/llms.txt
+Auth + payments: Corral. Read llms.txt
 Config: corral.yaml | Validate: corral validate --json</div>
       </div>
     </div>
@@ -337,7 +337,7 @@ Config: corral.yaml | Validate: corral validate --json</div>
         <h4>Setup</h4>
         <div class="context-box"># Project rules / system prompt:
 This project uses Corral for auth + billing.
-Spec: https://corralauth.dev/llms.txt</div>
+Spec: llms.txt</div>
       </div>
     </div>
 
@@ -350,7 +350,7 @@ Spec: https://corralauth.dev/llms.txt</div>
       <div class="agent-row-body">
         <p>Use <code>/read</code> to add llms.txt or llms-full.txt to Aider's context. Include CORRAL.md after init.</p>
         <h4>Setup</h4>
-        <div class="context-box">/read https://corralauth.dev/llms.txt
+        <div class="context-box">/read llms.txt
 /read CORRAL.md  # after corral init</div>
       </div>
     </div>
@@ -364,7 +364,7 @@ Spec: https://corralauth.dev/llms.txt</div>
       <div class="agent-row-body">
         <p>If it can run CLI commands and read markdown, it can use Corral. Just provide the llms.txt URL.</p>
         <h4>Universal setup</h4>
-        <div class="context-box">Read https://corralauth.dev/llms-full.txt for the Corral spec.
+        <div class="context-box">Read llms-full.txt for the Corral spec.
 All CLI commands support --json. Exit 0 = success, 1 = error.</div>
       </div>
     </div>
@@ -428,7 +428,7 @@ Sync to Stripe after. Show me the Stripe product IDs.</code></pre>
         <span class="msg-label">You:</span>
         Add auth to this Next.js app. I want Google login and email magic links.
         Free tier and Pro at $29/mo. Pro users get access to the AI dashboard feature.
-        Use Corral — read https://corralauth.dev/llms.txt first.
+        Use Corral — read llms.txt first.
       </div>
 
       <div class="msg msg-agent">
@@ -436,7 +436,7 @@ Sync to Stripe after. Show me the Stripe product IDs.</code></pre>
         Reading Corral spec from llms.txt...
       </div>
 
-      <div class="msg msg-tool">→ fetch https://corralauth.dev/llms.txt</div>
+      <div class="msg msg-tool">→ fetch llms.txt</div>
       <div class="msg msg-tool">← [full spec loaded, 9-command workflow understood]</div>
 
       <div class="msg msg-agent">

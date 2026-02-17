@@ -78,6 +78,36 @@ function detectFramework(config?: Record<string, any>): FrameworkName {
   return 'unknown';
 }
 
+/**
+ * Update gates.tsx PLAN_RANK to reflect all plans in corral.yaml.
+ * Called after add plan, add feature, etc.
+ */
+function updateGatesPlanRank(config: Record<string, any>): void {
+  const plans = config.plans || [];
+  const planNames: string[] = plans
+    .map((p: any) => typeof p === 'string' ? p : (p.name || ''))
+    .filter(Boolean);
+  if (planNames.length === 0) return;
+
+  // Find gates.tsx
+  const srcDir = existsSync('src') ? 'src' : '.';
+  const gatesPath = join(srcDir, 'gates.tsx');
+  if (!existsSync(gatesPath)) return;
+
+  let content = readFileSync(gatesPath, 'utf-8');
+  const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
+  const newRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
+  const rankRegex = /const PLAN_RANK: Record<string, number> = \{[^}]*\}/;
+
+  if (rankRegex.test(content)) {
+    const updated = content.replace(rankRegex, newRank);
+    if (updated !== content) {
+      writeFileSync(gatesPath, updated);
+      success(`Updated gates.tsx PLAN_RANK: ${planNames.join(', ')}`);
+    }
+  }
+}
+
 /** Convert a kebab-case or path slug to PascalCase component name. */
 function toPascalCase(s: string): string {
   return s
@@ -477,6 +507,7 @@ async function addPlanCommand(
     price: string;
     features?: string;
     trial?: string;
+    cta?: string;
     highlighted?: boolean;
     json?: boolean;
     config: string;
@@ -510,11 +541,13 @@ async function addPlanCommand(
     : [];
 
   const trialDays = opts.trial ? parseInt(opts.trial, 10) : 0;
-  const cta = trialDays > 0
-    ? 'Start Free Trial'
-    : price > 100
-      ? 'Contact Sales'
-      : 'Get Started';
+  const cta = opts.cta
+    ? opts.cta
+    : trialDays > 0
+      ? 'Start Free Trial'
+      : price === 0
+        ? 'Get Started'
+        : 'Subscribe';
 
   const newPlan: Record<string, any> = {
     name: planName,
@@ -537,6 +570,9 @@ async function addPlanCommand(
   if (!opts.dryRun) {
     success(`Added plan "${planName}" ($${price}/mo) to ${opts.config}`);
     if (existsSync('public/.well-known/llms.txt')) writeProjectLlmsTxt(opts.config);
+
+    // ─── Update gates.tsx PLAN_RANK to include all plans ─────────────
+    updateGatesPlanRank(config);
   }
   if (opts.trial) info(`Trial: ${opts.trial} days`);
   if (featuresList.length > 0) info(`Features: ${featuresList.join(', ')}`);
@@ -1036,6 +1072,7 @@ addCommand
   .requiredOption('--price <number>', 'Monthly price in USD')
   .option('--features <list>', 'Comma-separated feature names')
   .option('--trial <days>', 'Trial period in days')
+  .option('--cta <text>', 'Call-to-action button text (e.g. "Contact Sales")')
   .option('--highlighted', 'Mark as popular/highlighted plan')
   .option('--dry-run', 'Preview changes without writing files')
   .option('--json', 'Output as JSON')

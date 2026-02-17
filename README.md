@@ -24,12 +24,12 @@ npx create-corral validate
 # Done. Your app has auth + payments.
 ```
 
-**Agent context:** Tell your agent to read [`llms.txt`](https://corralauth.dev/llms.txt)
-or [`llms-full.txt`](https://corralauth.dev/llms-full.txt) for the full spec.
+**Agent context:** Tell your agent to read [`llms.txt`](llms.txt)
+or [`llms-full.txt`](llms-full.txt) for the full spec.
 
 Works with: **OpenClaw** (native skill) · **Claude Code** · **Codex** · **Cursor** · **Windsurf** · **Aider** · any agent that can run CLI commands
 
-→ [Full agent integration guide](https://corralauth.dev/agents.html)
+→ [Full agent integration guide](agents.html)
 
 ## For Humans
 
@@ -73,7 +73,7 @@ That's it. You have auth, billing, and feature gating running locally.
 
 ## Quick Start (Agents)
 
-Agents: read [`llms.txt`](https://corralauth.dev/llms.txt) for the full spec.
+Agents: read [`llms.txt`](llms.txt) for the full spec.
 The 9-command workflow:
 
 ```bash
@@ -145,11 +145,11 @@ npm run release
 
 ## Docs
 
-📖 **[corralauth.dev](https://corralauth.dev)**
+📖 **[docs.llamafarm.dev/corral](https://docs.llamafarm.dev/corral)**
 
-- [Agent Integration Guide](https://corralauth.dev/agents.html) — for AI coding agents
-- [llms.txt](https://corralauth.dev/llms.txt) — agent-readable spec
-- [Quickstart](https://corralauth.dev/quickstart.html) — for humans
+- [Agent Integration Guide](agents.html) — for AI coding agents
+- [llms.txt](llms.txt) — agent-readable spec
+- [Quickstart](quickstart.html.html) — for humans
 
 ## Contributing
 

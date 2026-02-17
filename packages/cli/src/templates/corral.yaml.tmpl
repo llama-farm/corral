@@ -60,32 +60,21 @@ auth:
   #   - "http://localhost:5173"
 
 # ── Plans & Features ──────────────────────────────────────────────────
-plans:
-  - name: free
-    display_name: "Free"
-    price: 0
-    features: ["Basic access"]
-    cta: "Get Started"
-
-  - name: pro
-    display_name: "Pro"
-    price: 29
-    interval: month
-    stripe_price_id: ""        # Set after: corral stripe sync
-    trial: true
-    popular: true
-    features:
-      - "Everything in free"
-      - "Priority support"
-    cta: "Start Free Trial"
+plans: []
+  # Add plans with: npx create-corral add plan <name> --price <amount>
+  # Examples:
+  #   npx create-corral add plan free --price 0
+  #   npx create-corral add plan pro --price 29 --trial 14 --features "Priority support,API access"
+  #   npx create-corral add plan enterprise --price 499 --features "SSO,Dedicated support"
 
 # Feature gating — maps feature IDs to allowed plan names
 # Special values: "*" (anyone incl. anonymous), "authenticated" (any logged-in user)
-features:
-  browse: ["*"]                # Anyone can browse
-  save: ["authenticated"]      # Must be logged in
-  export: ["free", "pro"]      # Free tier and up
-  # advanced: ["pro"]          # Pro only
+# Add features with: npx create-corral add feature <name> --plan <plan>
+features: {}
+  # Example:
+  # browse: ["*"]                # Anyone can browse
+  # save: ["authenticated"]      # Must be logged in
+  # export: ["free", "pro"]      # Free tier and up
 
 # ── Billing ────────────────────────────────────────────────────────────
 billing:
@@ -101,19 +90,11 @@ billing:
   cancel_behavior: end_of_period
 
 # ── Usage Meters ────────────────────────────────────────────────────────
-meters:
-  api_calls:
-    label: "API Calls"
-    unit: requests
-    type: cap
-    reset_period: month
-    limits:
-      free: 100
-      pro: 10000
-    warning_at: 0.8
-    nudge:
-      message: "You've used {{percent}}% of your API calls"
-      cta: "Upgrade"
+meters: {}
+  # Add meters with: npx create-corral add meter <name> --limit <n> --plan <plan>
+  # Example:
+  #   npx create-corral add meter api_calls --limit 100 --plan free
+  #   npx create-corral add meter api_calls --limit 10000 --plan pro
 
 # ── Seed Data ──────────────────────────────────────────────────────────
 seed:
@@ -121,15 +102,12 @@ seed:
     email: "admin@example.com"
     password: "admin123"
     name: "Admin"
-  test_users:
-    - email: "user@example.com"
-      password: "test123"
-      name: "Test User"
-      plan: free
-    - email: "pro@example.com"
-      password: "test123"
-      name: "Pro User"
-      plan: pro
+  test_users: []
+    # Add test users after adding plans:
+    # - email: "user@example.com"
+    #   password: "test123"
+    #   name: "Test User"
+    #   plan: free
 
 # ── Admin Dashboard ────────────────────────────────────────────────────
 admin:

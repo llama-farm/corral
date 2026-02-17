@@ -969,11 +969,11 @@ Required production env vars:
 
 ## More
 
-- Concise llms.txt: https://corralauth.dev/llms.txt
-- Quickstart: https://corralauth.dev/quickstart
-- CLI Reference: https://corralauth.dev/cli
-- API Reference: https://corralauth.dev/api
-- Framework Guides: https://corralauth.dev/frameworks
+- Concise llms.txt: llms.txt
+- Quickstart: quickstart.html
+- CLI Reference: cli.html
+- API Reference: api.html
+- Framework Guides: frameworks.html
 - GitHub: https://github.com/llama-farm/corral
 - License: MIT
 - Built by LlamaFarm: https://github.com/llama-farm
