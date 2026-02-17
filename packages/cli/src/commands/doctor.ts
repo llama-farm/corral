@@ -72,6 +72,7 @@ export async function doctorCommand(opts: { json?: boolean; config: string; url?
     'app/api/auth/[...corral]/route.ts',
     'src/app/api/auth/[...all]/route.ts',
     'server/auth.ts',                     // SPA standalone
+    'src/auth.ts',                        // Hono / Express standalone
     'server/auth.js',
   ];
   const foundRoute = routePaths.find(p => existsSync(p));
