@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: {{APP_NAME}}
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: AUTH_PORT
+        value: "3456"
+      - key: AUTH_URL
+        value: "http://localhost:3456"
+      - key: PORT
+        value: "8000"
+      - key: CORRAL_DB_PATH
+        value: "/app/data/corral.db"
+      - key: CORRAL_SECRET
+        value: "{{CORRAL_SECRET}}"

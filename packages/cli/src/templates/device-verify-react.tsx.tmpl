@@ -40,7 +40,7 @@ interface Props {
   appName?: string;
 }
 
-export function DeviceVerify({ appName = '[[APP_NAME]]' }: Props) {
+export function DeviceVerify({ appName = '{{APP_NAME}}' }: Props) {
   const [searchParams] = useSearchParams();
   const userCode = searchParams.get('code') || '';
 

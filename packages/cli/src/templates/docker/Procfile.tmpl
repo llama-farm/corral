@@ -12,3 +12,6 @@ web: node server/auth.js & ./backend
 # {{#if_ruby}}
 web: node server/auth.js & bundle exec {{RUBY_CMD}}
 # {{/if_ruby}}
+# {{#if_node}}
+web: node server/auth.js & npm start
+# {{/if_node}}

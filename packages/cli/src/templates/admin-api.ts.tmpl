@@ -30,7 +30,7 @@
 //
 // Template vars substituted at generation time:
 //   PAID_PLAN         = "{{PAID_PLAN}}"
-//   STRIPE_PRICE_FIELD = "{{STRIPE_PRICE_FIELD}}"
+//   STRIPE_PRICE_FIELD = "stripe_price_id"
 //   TRIAL_DAYS        = {{TRIAL_DAYS}}
 //   SUCCESS_URL       = "{{SUCCESS_URL}}"
 //   CANCEL_URL        = "{{CANCEL_URL}}"
@@ -433,7 +433,7 @@ export function mountCorralRoutes(app: express.Application): void {
    * POST /api/billing/checkout
    * Body: { plan?: string }  — defaults to "{{PAID_PLAN}}"
    *
-   * Reads the Stripe price ID from corral.yaml ({{STRIPE_PRICE_FIELD}} field).
+   * Reads the Stripe price ID from corral.yaml (stripe_price_id field).
    * Returns { url } — open this in a new tab on the frontend.
    *
    * On success, Stripe redirects to SUCCESS_URL and fires the webhook.
@@ -454,9 +454,9 @@ export function mountCorralRoutes(app: express.Application): void {
 
       // Locate Stripe price ID in corral.yaml
       const yamlContent = readCorralYaml();
-      // Match: name: <plan> ... {{STRIPE_PRICE_FIELD}}: price_xxx
+      // Match: name: <plan> ... stripe_price_id: price_xxx
       const priceRegex = new RegExp(
-        `name:\\s*${targetPlan}[\\s\\S]*?{{STRIPE_PRICE_FIELD}}:\\s*["']?([\\w_]+)`,
+        `name:\\s*${targetPlan}[\\s\\S]*?stripe_price_id:\\s*["']?([\\w_]+)`,
         "i"
       );
       const priceMatch = yamlContent.match(priceRegex);

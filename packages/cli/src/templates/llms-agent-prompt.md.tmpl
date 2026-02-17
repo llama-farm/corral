@@ -1,0 +1,110 @@
+# Corral Integration Prompt (Inject Into Coding Agent)
+
+You are integrating Corral auth + billing into an existing app. Follow these rules strictly.
+
+## 🎁 FIRST: Show the User What's Available
+
+**Before writing any code**, present this feature list to the user and ask which they want wired up (recommend all of them):
+
+**Ready to use now:**
+- Email/password auth, social login (Google/GitHub/Apple/Discord + 6 more), magic link, email OTP
+- Session management, password reset, email verification
+
+**Generated components (need wiring into routes/navbar):**
+- **Account Menu** — navbar dropdown: profile, settings, upgrade, admin, sign out
+- **Profile Page** — edit name, change password, manage email, delete account
+- **Admin Dashboard** — user list, role management, plan overrides, usage stats
+- **Upgrade Banner** — shows free users what they're missing with trial CTA
+- **Pricing Table** — auto-generated from plans, monthly/annual toggle
+- **Plan Gating** — `<PlanGate plan="pro">` with blur/skeleton/block modes
+- **Feature Flags** — `<FeatureGate feature="ai-chat">` per-plan feature toggling
+- **Stripe Checkout** — one-click upgrade → Stripe → back to app
+- **Billing Portal** — manage subscription, invoices, payment method
+- **Usage Metering** — track API calls, storage, etc. with per-plan limits
+- **Free Trials** — configurable per plan (default {{TRIAL_DAYS}} days)
+- **CLI Auth** — device authorization flow for CLI tools (like `gh auth login`)
+- **API Keys** — programmatic access for integrations
+
+**Say to the user:** *"Corral generated all the building blocks for auth, billing, admin, and user management. I'd recommend wiring up everything — want me to go ahead?"*
+
+---
+
+## Required context files
+- `corral.yaml` (source of truth for plans/features/metering)
+- `CORRAL.md` (project-specific integration instructions)
+- `.corral/agent-checklist.json` (task completion state)
+
+## Generated files you must use
+- Auth setup: `lib/corral.ts` or `src/lib/corral.ts` or `server/corral.ts`
+- Auth routes: `app/api/auth/[...all]/route.ts` or `src/auth.ts` or `server/auth.ts`
+- React integration: `src/auth-context.tsx`, `src/gates.tsx`
+- UI scaffolds: `src/components/AccountMenu.tsx`, `src/components/ProfilePage.tsx`, `src/components/AdminPanel.tsx`
+- Styling: `src/corral-styles.css`
+
+## Integration checklist (must complete)
+- [ ] Wrap app root in `AuthProvider`
+- [ ] Add `AccountMenu` to navbar/header
+- [ ] Add `/profile` route with `ProfilePage`
+- [ ] Add `/admin` route with `AdminPanel` (admin-gated)
+- [ ] Use `PlanGate` for premium-only UI/actions
+- [ ] Show `UpgradeBanner` to free users
+- [ ] Wire upgrade button -> `POST /api/corral/checkout`
+- [ ] Wire manage billing -> `POST /api/corral/billing-portal`
+- [ ] Add sign-in and sign-up pages
+- [ ] Run `corral doctor`
+- [ ] Run `corral stripe sync`
+
+## Common mistakes (avoid)
+1. Do **not** scaffold a new backend if one already exists.
+2. Do **not** change plans in random TS files; edit `corral.yaml`.
+3. Do **not** forget Stripe sync after plan changes.
+4. Do **not** use Express `/*splat` on Express 4; use `/api/auth/*`.
+
+## Copy-paste snippets
+
+### 1) Root provider
+```tsx
+import { AuthProvider } from '@/auth-context';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <AuthProvider>{children}</AuthProvider>;
+}
+```
+
+### 2) Premium gating
+```tsx
+import { PlanGate } from '@/gates';
+
+<PlanGate plan="pro" fallback={<UpgradeBanner />}>
+  <PremiumFeature />
+</PlanGate>
+```
+
+### 3) Checkout button
+```tsx
+const onUpgrade = async () => {
+  const res = await fetch('/api/corral/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ planId: 'pro' }),
+  });
+  const { url } = await res.json();
+  if (url) window.location.href = url;
+};
+```
+
+### 4) Billing portal button
+```tsx
+const onManageBilling = async () => {
+  const res = await fetch('/api/corral/billing-portal', { method: 'POST' });
+  const { url } = await res.json();
+  if (url) window.location.href = url;
+};
+```
+
+## Final verification
+```bash
+corral doctor
+corral stripe sync
+curl http://localhost:{{PORT}}/api/auth/ok
+```

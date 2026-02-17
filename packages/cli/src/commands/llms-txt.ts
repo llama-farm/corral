@@ -699,7 +699,7 @@ export async function llmsTxtCommand(opts: {
     const port = opts.port || 7331;
     const server = createServer((req, res) => {
       const url = (req.url || '/').split('?')[0];
-      if (url === '/llms.txt' || url === '/') {
+      if (url === '/llms.txt' || url === '/llm.txt' || url === '/') {
         res.writeHead(200, {
           'Content-Type': 'text/plain; charset=utf-8',
           'Access-Control-Allow-Origin': '*',
@@ -731,14 +731,30 @@ export async function llmsTxtCommand(opts: {
   if (opts.output) {
     const outPath = resolve(opts.output);
     mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, content, 'utf-8');
+
+    // Respect --full for the requested output path.
+    const primaryContent = opts.full ? fullContent : content;
+    writeFileSync(outPath, primaryContent, 'utf-8');
     success(`Written: ${chalk.cyan(opts.output)}`);
 
-    // Also write llms-full.txt next to it
-    const fullOut = outPath.replace(/llms\.txt$/, 'llms-full.txt');
-    const fullOutRel = opts.output.replace(/llms\.txt$/, 'llms-full.txt');
-    writeFileSync(fullOut, fullContent, 'utf-8');
-    success(`Written: ${chalk.cyan(fullOutRel)}`);
+    // Also write the alternate variant next to it.
+    const isFullNamed = /llms-full\.txt$/.test(outPath);
+    let altOut = isFullNamed
+      ? outPath.replace(/llms-full\.txt$/, 'llms.txt')
+      : outPath.replace(/llms\.txt$/, 'llms-full.txt');
+    let altOutRel = isFullNamed
+      ? opts.output.replace(/llms-full\.txt$/, 'llms.txt')
+      : opts.output.replace(/llms\.txt$/, 'llms-full.txt');
+
+    // If output filename is custom (no llms.txt suffix), place alternate variant beside it.
+    if (altOut === outPath) {
+      altOut = `${outPath}${opts.full ? '.standard' : '.full'}`;
+      altOutRel = `${opts.output}${opts.full ? '.standard' : '.full'}`;
+    }
+
+    const altContent = opts.full ? content : fullContent;
+    writeFileSync(altOut, altContent, 'utf-8');
+    success(`Written: ${chalk.cyan(altOutRel)}`);
 
     // Hint about serving it
     info(`Add to your server: GET /.well-known/llms.txt → ${opts.output}`);

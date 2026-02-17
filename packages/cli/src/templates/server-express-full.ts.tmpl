@@ -8,6 +8,36 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "./corral.js";
 import { createCorralRoutes } from "@llamafarm/corral/routes";
 
+// toNodeHandler(auth) works with any Node HTTP stack.
+// Mount examples for embedded backends:
+//
+// Express:
+//   const authHandler = toNodeHandler(auth);
+//   app.use((req, res, next) => req.url.startsWith('/api/auth') ? authHandler(req, res) : next());
+//
+// Koa:
+//   router.all('/api/auth/(.*)', async (ctx) => {
+//     await new Promise<void>((resolve) => {
+//       toNodeHandler(auth)(ctx.req, ctx.res);
+//       ctx.res.on('finish', () => resolve());
+//     });
+//     ctx.respond = false;
+//   });
+//
+// Fastify:
+//   fastify.all('/api/auth/*', (request, reply) => toNodeHandler(auth)(request.raw, reply.raw));
+//
+// Hono (Node):
+//   app.all('/api/auth/*', (c) => auth.handler(c.req.raw));
+//
+// Generic Node http.createServer:
+//   import http from 'node:http';
+//   const authHandler = toNodeHandler(auth);
+//   http.createServer((req, res) => {
+//     if ((req.url || '').startsWith('/api/auth')) return authHandler(req, res);
+//     res.statusCode = 404; res.end('Not found');
+//   }).listen(3001);
+
 const app = express();
 const port = parseInt(process.env.CORRAL_PORT || "{{PORT}}");
 const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";

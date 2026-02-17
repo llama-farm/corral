@@ -10,6 +10,36 @@ import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./corral.js";
 
+// toNodeHandler(auth) works with any Node HTTP stack.
+// Mount examples for embedded backends:
+//
+// Express:
+//   const authHandler = toNodeHandler(auth);
+//   app.use((req, res, next) => req.url.startsWith('/api/auth') ? authHandler(req, res) : next());
+//
+// Koa:
+//   router.all('/api/auth/(.*)', async (ctx) => {
+//     await new Promise<void>((resolve) => {
+//       toNodeHandler(auth)(ctx.req, ctx.res);
+//       ctx.res.on('finish', () => resolve());
+//     });
+//     ctx.respond = false;
+//   });
+//
+// Fastify:
+//   fastify.all('/api/auth/*', (request, reply) => toNodeHandler(auth)(request.raw, reply.raw));
+//
+// Hono (Node):
+//   app.all('/api/auth/*', (c) => auth.handler(c.req.raw));
+//
+// Generic Node http.createServer:
+//   import http from 'node:http';
+//   const authHandler = toNodeHandler(auth);
+//   http.createServer((req, res) => {
+//     if ((req.url || '').startsWith('/api/auth')) return authHandler(req, res);
+//     res.statusCode = 404; res.end('Not found');
+//   }).listen(3001);
+
 const app = express();
 const port = parseInt(process.env.CORRAL_PORT || "{{PORT}}");
 
@@ -30,6 +60,41 @@ const authHandler = toNodeHandler(auth);
 app.use((req: any, res: any, next: any) => {
   if (req.url.startsWith("/api/auth")) return authHandler(req, res);
   next();
+});
+
+// Billing: Stripe Webhook (must be BEFORE express.json)
+app.post("/api/billing/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) return res.status(500).json({ error: "STRIPE_SECRET_KEY not set" });
+
+    const { createRequire } = await import("module");
+    const require_ = createRequire(process.cwd() + "/package.json");
+    const Stripe = require_("stripe");
+    const stripe = new Stripe(stripeKey);
+
+    const sig = req.headers["stripe-signature"] as string | undefined;
+    const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    const event = (sig && whSecret)
+      ? stripe.webhooks.constructEvent(req.body, sig, whSecret)
+      : JSON.parse((req.body as Buffer).toString());
+
+    if (event.type === "checkout.session.completed") {
+      const data = event.data.object;
+      if (data.metadata?.plan && data.metadata?.userId) {
+        const Database = (await import("better-sqlite3")).default;
+        const db = new Database(require("path").resolve(process.cwd(), "corral.db"));
+        db.prepare('UPDATE "user" SET plan = ? WHERE id = ?').run(data.metadata.plan, data.metadata.userId);
+        db.close();
+        console.log(`Corral: Plan upgraded ${data.metadata.userId} -> ${data.metadata.plan}`);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || "Invalid webhook payload" });
+  }
 });
 
 app.use(express.json());
@@ -168,24 +233,6 @@ app.post("/api/billing/checkout", async (req, res) => {
 
     res.json({ url: checkoutSession.url });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
-});
-
-// Billing: Stripe Webhook
-app.post("/api/billing/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  try {
-    const event = req.body;
-    if (event.type === "checkout.session.completed") {
-      const data = event.data.object;
-      if (data.metadata?.plan && data.metadata?.userId) {
-        const Database = (await import("better-sqlite3")).default;
-        const db = new Database(require("path").resolve(process.cwd(), "corral.db"));
-        db.prepare('UPDATE "user" SET plan = ? WHERE id = ?').run(data.metadata.plan, data.metadata.userId);
-        db.close();
-        console.log(`🤠 Corral: Plan upgraded → ${data.metadata.userId} → ${data.metadata.plan}`);
-      }
-    }
-    res.json({ received: true });
-  } catch { res.status(400).send(); }
 });
 
 // Health check

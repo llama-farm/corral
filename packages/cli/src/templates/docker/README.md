@@ -60,7 +60,7 @@ Use this when you want to expose auth endpoints directly (e.g., for client-side 
 
 ## Template Variables
 
-Files use `{{PLACEHOLDER}}` syntax, replaced by `corral init`:
+Files use `<PLACEHOLDER>` syntax, replaced by `corral init`:
 
 - `{{BACKEND_LANG}}` — python, go, rust, ruby
 - `{{BACKEND_SRC}}` — source directory (e.g., `app/`, `src/`)

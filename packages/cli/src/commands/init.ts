@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { randomBytes } from 'crypto';
 import chalk from 'chalk';
-import { success, info, warn, jsonOutput } from '../util.js';
+import { success, info, warn, jsonOutput, renderTemplate } from '../util.js';
 import { writeProjectLlmsTxt } from './serve-llms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -28,10 +28,10 @@ interface Framework {
   hasProxy: boolean;
   isSPA: boolean;     // client-only — needs separate auth server
   isPython: boolean;  // Python backend — needs middleware + separate auth server
-  serverFramework?: string; // for SPAs: which server to scaffold
+  serverFramework?: string; // detected backend framework label
 }
 
-function detectFramework(): Framework {
+export function detectFramework(): Framework {
   try {
     const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
@@ -60,20 +60,112 @@ function detectFramework(): Framework {
       }
     }
 
+    const detectServerFrameworkFromDeps = (allDeps: Record<string, any>): string | null => {
+      if (allDeps['hono']) return 'hono';
+      if (allDeps['express']) return 'express';
+      if (allDeps['fastify']) return 'fastify';
+      if (allDeps['koa']) return 'koa';
+      if (allDeps['@hapi/hapi'] || allDeps['hapi']) return 'hapi';
+      if (allDeps['polka']) return 'polka';
+      if (allDeps['restify']) return 'restify';
+      if (allDeps['nestjs'] || allDeps['@nestjs/core']) return 'nestjs';
+      if (allDeps['adonis'] || allDeps['@adonisjs/core']) return 'adonis';
+      if (allDeps['elysia']) return 'elysia';
+      if (allDeps['h3'] || allDeps['nitro']) return 'h3';
+      if (allDeps['oak']) return 'oak';
+      if (allDeps['sails']) return 'sails';
+      return null;
+    };
+
+    // Detect local server code (for workspace-root deps and monorepo hoisting)
+    const serverEntryCandidates = ['src/index.ts', 'src/server.ts', 'src/app.ts', 'server.ts', 'server/index.ts'];
+    let hasServerCode = false;
+    let hasHonoServerCode = false;
+    for (const entry of serverEntryCandidates) {
+      if (!existsSync(entry)) continue;
+      const content = readFileSync(entry, 'utf-8');
+      const genericServerHints =
+        content.includes('listen(') ||
+        content.includes('createServer(') ||
+        content.includes('.use(') ||
+        content.includes('app.get(');
+      if (genericServerHints) hasServerCode = true;
+      if (
+        content.includes("from 'hono'") ||
+        content.includes('from "hono"') ||
+        content.includes('new Hono(') ||
+        content.includes('new Hono()')
+      ) {
+        hasServerCode = true;
+        hasHonoServerCode = true;
+      }
+    }
+
+    const hasServerDirPkg = existsSync('server/package.json');
+
+    let hasNodeTargetTsconfig = false;
+    if (existsSync('tsconfig.json')) {
+      try {
+        const raw = readFileSync('tsconfig.json', 'utf-8');
+        hasNodeTargetTsconfig =
+          raw.includes('"module": "commonjs"') ||
+          raw.includes('"module":"commonjs"') ||
+          raw.includes('"moduleResolution": "node"') ||
+          raw.includes('"types": ["node"') ||
+          raw.includes('"types":["node"');
+      } catch {}
+    }
+
+    const detectedServerDep = detectServerFrameworkFromDeps(deps);
+    const hasAnyServer = !!detectedServerDep || hasServerCode || hasServerDirPkg;
+
     // Full-stack frameworks (have their own server)
     if (deps['next']) return { name: 'nextjs', port, hasRewrites, hasProxy: false, isSPA: false, isPython: false };
-    
-    // Server frameworks (standalone)
-    if (deps['hono'] && !deps['react']) return { name: 'hono', port, hasRewrites: false, hasProxy: false, isSPA: false, isPython: false };
-    if (deps['express'] && !deps['react']) return { name: 'express', port, hasRewrites: false, hasProxy: false, isSPA: false, isPython: false };
+
+    // Full-stack React + server framework (must be before SPA checks)
+    if (deps['react'] && hasAnyServer) {
+      const sf = hasHonoServerCode ? 'hono' : (detectedServerDep || 'node-server');
+      return {
+        name: sf === 'hono' ? 'hono' : 'express',
+        port,
+        hasRewrites: false,
+        hasProxy,
+        isSPA: false,
+        isPython: false,
+        serverFramework: sf,
+      };
+    }
+
+    // Standalone JS server frameworks
+    if (hasAnyServer) {
+      const sf = hasHonoServerCode ? 'hono' : (detectedServerDep || 'node-server');
+      return {
+        name: sf === 'hono' ? 'hono' : 'express',
+        port,
+        hasRewrites: false,
+        hasProxy: false,
+        isSPA: false,
+        isPython: false,
+        serverFramework: sf,
+      };
+    }
+
+    // React + node-target tsconfig is likely full-stack even when deps are hoisted
+    if (deps['react'] && hasNodeTargetTsconfig) {
+      return {
+        name: 'express',
+        port,
+        hasRewrites: false,
+        hasProxy,
+        isSPA: false,
+        isPython: false,
+        serverFramework: 'node-server',
+      };
+    }
 
     // SPA frameworks (client-only — need a separate auth server)
     if (deps['vite'] && deps['react']) return { name: 'vite-react', port: port || 5173, hasRewrites: false, hasProxy, isSPA: true, isPython: false };
     if (deps['react-scripts']) return { name: 'cra', port: port || 3000, hasRewrites: false, hasProxy: false, isSPA: true, isPython: false };
-
-    // React + Hono/Express = full-stack SPA with API server
-    if (deps['react'] && deps['hono']) return { name: 'hono', port, hasRewrites: false, hasProxy, isSPA: false, isPython: false };
-    if (deps['react'] && deps['express']) return { name: 'express', port, hasRewrites: false, hasProxy, isSPA: false, isPython: false };
 
     // Plain React with no server framework detected
     if (deps['react']) return { name: 'vite-react', port: 5173, hasRewrites: false, hasProxy, isSPA: true, isPython: false };
@@ -125,13 +217,13 @@ function detectFramework(): Framework {
 interface ExistingServer {
   path: string;          // relative path from cwd (e.g. "../server")
   absPath: string;       // absolute resolved path
-  framework: 'express' | 'hono' | 'fastify';
+  framework: string;
   entryFile: string;     // e.g. "../server/src/index.ts"
   srcDir: string;        // e.g. "../server/src"
 }
 
 function detectExistingServer(): ExistingServer | null {
-  const SERVER_ENTRIES = ['src/index.ts', 'src/app.ts', 'src/server.ts', 'index.ts', 'src/main.ts'];
+  const SERVER_ENTRIES = ['src/index.ts', 'src/app.ts', 'src/server.ts', 'index.ts', 'src/main.ts', 'server.ts', 'server/index.ts'];
 
   function checkWorkspace(relPath: string): ExistingServer | null {
     const pkgPath = join(relPath, 'package.json');
@@ -139,7 +231,21 @@ function detectExistingServer(): ExistingServer | null {
     try {
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      const framework = deps['express'] ? 'express' : deps['hono'] ? 'hono' : deps['fastify'] ? 'fastify' : null;
+      const framework =
+        deps['hono'] ? 'hono' :
+        deps['express'] ? 'express' :
+        deps['fastify'] ? 'fastify' :
+        deps['koa'] ? 'koa' :
+        (deps['@hapi/hapi'] || deps['hapi']) ? 'hapi' :
+        deps['polka'] ? 'polka' :
+        deps['restify'] ? 'restify' :
+        (deps['nestjs'] || deps['@nestjs/core']) ? 'nestjs' :
+        (deps['adonis'] || deps['@adonisjs/core']) ? 'adonis' :
+        deps['elysia'] ? 'elysia' :
+        (deps['h3'] || deps['nitro']) ? 'h3' :
+        deps['oak'] ? 'oak' :
+        deps['sails'] ? 'sails' :
+        null;
       if (!framework) return null;
       for (const entry of SERVER_ENTRIES) {
         const entryPath = join(relPath, entry);
@@ -211,6 +317,46 @@ function detectExistingServer(): ExistingServer | null {
   return null;
 }
 
+function detectLocalServerEntry(): string | null {
+  for (const entry of ['src/index.ts', 'src/server.ts', 'src/app.ts', 'server.ts', 'server/index.ts']) {
+    if (!existsSync(entry)) continue;
+    const content = readFileSync(entry, 'utf-8');
+    const hasServerSetup =
+      content.includes("from 'express'") ||
+      content.includes('from "express"') ||
+      content.includes('require(\'express\')') ||
+      content.includes('express()') ||
+      content.includes("from 'hono'") ||
+      content.includes('from "hono"') ||
+      content.includes('new Hono(') ||
+      content.includes('new Hono()') ||
+      content.includes('listen(') ||
+      content.includes('createServer(') ||
+      content.includes('.use(') ||
+      content.includes('app.get(');
+    if (hasServerSetup) return entry;
+  }
+  return null;
+}
+
+function hasReactDepsInCurrentPackage(): boolean {
+  try {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    return !!deps['react'];
+  } catch {
+    return false;
+  }
+}
+
+function getServerMountSnippet(framework: string, importPath: string): string {
+  if (framework === 'hono') {
+    return `import { auth } from '${importPath}';\n// Mount Corral auth:\napp.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));`;
+  }
+
+  return `import { auth } from '${importPath}';\nimport { toNodeHandler } from 'better-auth/node';\n// Mount Corral auth:\nconst authHandler = toNodeHandler(auth);\napp.all('/api/auth/*', (req, res) => authHandler(req, res));`;
+}
+
 // ─── Vite Proxy Port Detection ─────────────────────────────────────
 // Read actual server port from existing vite proxy config, env, or package.json.
 function getViteProxyServerPort(fallback: number): number {
@@ -246,11 +392,40 @@ function getViteProxyServerPort(fallback: number): number {
 }
 
 function replaceVars(tmpl: string, vars: Record<string, string>): string {
-  let result = tmpl;
-  for (const [k, v] of Object.entries(vars)) {
-    result = result.replaceAll(`{{${k}}}`, v);
+  return renderTemplate(tmpl, vars);
+}
+
+function ensureAgentChecklist(framework: string, database: string, results: string[]): void {
+  const dir = '.corral';
+  const path = join(dir, 'agent-checklist.json');
+  mkdirSync(dir, { recursive: true });
+
+  if (!existsSync(path)) {
+    const payload = {
+      generated: new Date().toISOString(),
+      framework,
+      database,
+      checklist: {
+        auth_provider_wrapped: false,
+        account_menu_added: false,
+        profile_route_added: false,
+        admin_route_added: false,
+        plan_gates_added: false,
+        upgrade_banner_added: false,
+        stripe_checkout_wired: false,
+        stripe_portal_wired: false,
+        signin_page_added: false,
+        doctor_passed: false,
+        stripe_synced: false,
+      },
+    };
+
+    writeFileSync(path, JSON.stringify(payload, null, 2) + '\n');
+    results.push(path);
+    success(`Created ${path} (agent integration checklist)`);
+  } else {
+    info(`${path} already exists, preserving checklist progress`);
   }
-  return result;
 }
 
 /**
@@ -712,6 +887,9 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     success('Created CORRAL.md (agent discovery file)');
   }
 
+  // Step 2b: Generate machine-readable agent checklist
+  ensureAgentChecklist(framework.name, db, results);
+
   // ─── Shared helper: generate gates.tsx with dynamic PLAN_RANK ──────
   async function generateGates(destPath: string): Promise<void> {
     if (existsSync(destPath)) return;
@@ -761,11 +939,7 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
       }
 
       // Generate mount instructions (and optionally auto-patch server entry)
-      const mountSnippet = existingServer.framework === 'hono'
-        ? `import { auth } from './corral.js';\nimport { serve } from '@hono/node-server';\n// Mount Corral auth:\napp.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));`
-        : existingServer.framework === 'fastify'
-        ? `import { auth } from './corral.js';\nimport { toNodeHandler } from 'better-auth/node';\n// Mount Corral auth:\napp.all('/api/auth/*', toNodeHandler(auth));`
-        : `import { auth } from './corral.js';\nimport { toNodeHandler } from 'better-auth/node';\n// Mount Corral auth:\nconst authHandler = toNodeHandler(auth);\napp.all('/api/auth/*', (req, res) => authHandler(req, res));`;
+      const mountSnippet = getServerMountSnippet(existingServer.framework, './corral.js');
 
       // Try to auto-patch the server entry file
       if (existsSync(existingServer.entryFile)) {
@@ -1169,8 +1343,69 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
       success(`Created ${setupPath} (${db})`);
     }
 
+  } else if (framework.name === 'express') {
+    // ─── Express: in-place auth integration ──────────────────────────
+    const nonSpaSetupMap: Record<string, string> = {
+      sqlite: 'setup.ts.tmpl', pg: 'setup-pg.ts.tmpl', mysql: 'setup-mysql.ts.tmpl',
+      turso: 'setup-turso.ts.tmpl', d1: 'setup-d1.ts.tmpl',
+    };
+
+    const setupPath = 'src/lib/corral.ts';
+    if (!existsSync(setupPath)) {
+      mkdirSync(dirname(setupPath), { recursive: true });
+      writeFileSync(setupPath, replaceVars(loadTemplate(nonSpaSetupMap[db] || 'setup.ts.tmpl'), vars));
+      results.push(setupPath);
+      success(`Created ${setupPath} (${db})`);
+    }
+
+    const localEntry = detectLocalServerEntry();
+    if (localEntry && existsSync(localEntry)) {
+      const entryContent = readFileSync(localEntry, 'utf-8');
+      if (!entryContent.includes('corral') && !entryContent.includes('better-auth')) {
+        const mountSnippet = getServerMountSnippet(framework.serverFramework || 'express', './lib/corral.js');
+        const patchedContent =
+          `// ─── Corral Auth (added by corral init) ───────────────────────────\n` +
+          `// ${mountSnippet.split('\n').join('\n// ')}\n` +
+          `// ──────────────────────────────────────────────────────────────────\n\n` +
+          entryContent;
+        writeFileSync(localEntry, patchedContent);
+        success(`Prepended auth mount instructions to ${localEntry} (commented — review and uncomment)`);
+      } else {
+        info(`${localEntry} already references auth — skipping patch`);
+      }
+    }
+
+    const hasReact = hasReactDepsInCurrentPackage();
+    if (hasReact) {
+      const srcDir = existsSync('src') ? 'src' : '.';
+      const authContextPath = join(srcDir, 'auth-context.tsx');
+      if (!existsSync(authContextPath)) {
+        writeFileSync(authContextPath, replaceVars(loadTemplate('auth-context.tsx.tmpl'), vars));
+        results.push(authContextPath);
+        success(`Created ${authContextPath} (React auth provider + useAuth hook)`);
+      }
+
+      await generateGates(join(srcDir, 'gates.tsx'));
+      const localServer: ExistingServer = {
+        path: '.',
+        absPath: resolve('.'),
+        framework: 'express',
+        entryFile: localEntry || join(srcDir, 'index.ts'),
+        srcDir,
+      };
+      await scaffoldFrontendComponents(srcDir, vars, results, localServer);
+    } else {
+      const adminApiPath = 'src/corral-admin-routes.ts';
+      if (!existsSync(adminApiPath)) {
+        writeFileSync(adminApiPath, replaceVars(loadTemplate('admin-api.ts.tmpl'), vars));
+        results.push(adminApiPath);
+        success(`Created ${adminApiPath} (admin & billing API routes)`);
+        info(`Mount: app.use('/api/corral', (await import('./corral-admin-routes.js')).default)`);
+      }
+    }
+
   } else {
-    // ─── Express / unknown: standalone server ────────────────────────
+    // ─── Unknown non-SPA framework ───────────────────────────────────
     const nonSpaSetupMap: Record<string, string> = {
       sqlite: 'setup.ts.tmpl', pg: 'setup-pg.ts.tmpl', mysql: 'setup-mysql.ts.tmpl',
       turso: 'setup-turso.ts.tmpl', d1: 'setup-d1.ts.tmpl',
@@ -1306,8 +1541,40 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     } : null,
   }, !!opts.json)) return;
 
-  // Human-friendly next steps
+  // ─── Feature showcase (show users what they get!) ─────────────────
   console.log('');
+  console.log(chalk.bold.green('🎁 Here\'s everything Corral just set up for you:\n'));
+  console.log(chalk.bold('  Authentication (ready to use)'));
+  console.log(`    ${chalk.green('✅')} Email/password sign-up & sign-in`);
+  console.log(`    ${chalk.green('✅')} Social login (Google, GitHub, Apple, Discord + 6 more)`);
+  console.log(`    ${chalk.green('✅')} Magic link & email OTP (passwordless)`);
+  console.log(`    ${chalk.green('✅')} Session management, password reset, email verification`);
+  console.log('');
+  console.log(chalk.bold('  User Experience (components generated — wire them up!)'));
+  console.log(`    ${chalk.yellow('🔌')} Account Menu — dropdown for navbar (profile, upgrade, admin, sign out)`);
+  console.log(`    ${chalk.yellow('🔌')} Profile Page — edit name, change password, delete account`);
+  console.log(`    ${chalk.yellow('🔌')} Sign-in / Sign-up Pages — social buttons, magic link, OTP tabs`);
+  console.log(`    ${chalk.yellow('🔌')} Upgrade Banner — show free users what they're missing`);
+  console.log('');
+  console.log(chalk.bold('  Billing & Monetization (Stripe-powered)'));
+  console.log(`    ${chalk.yellow('🔌')} Pricing Table — auto-generated from corral.yaml plans`);
+  console.log(`    ${chalk.yellow('🔌')} Upgrade Flow — one-click → Stripe Checkout → back to app`);
+  console.log(`    ${chalk.yellow('🔌')} Billing Portal — manage subscription, invoices, payment method`);
+  console.log(`    ${chalk.yellow('🔌')} Plan Gating — lock features with <PlanGate plan="pro">`);
+  console.log(`    ${chalk.yellow('🔌')} Usage Metering — track API calls, storage with per-plan limits`);
+  console.log(`    ${chalk.yellow('🔌')} Free Trials — ${vars.TRIAL_DAYS}-day trials, configurable per plan`);
+  console.log('');
+  console.log(chalk.bold('  Admin & Developer Tools'));
+  console.log(`    ${chalk.yellow('🔌')} Admin Dashboard — user list, roles, plan overrides, stats`);
+  console.log(`    ${chalk.yellow('🔌')} Feature Flags — gate anything by plan: <FeatureGate feature="x">`);
+  console.log(`    ${chalk.yellow('🔌')} CLI Auth — device authorization flow (like gh auth login)`);
+  console.log(`    ${chalk.yellow('🔌')} API Keys — programmatic access for integrations`);
+  console.log('');
+  console.log(chalk.dim('  ✅ = works now  🔌 = generated, needs wiring into your app'));
+  console.log(chalk.dim('  See CORRAL.md for the full integration checklist'));
+  console.log('');
+
+  // Human-friendly next steps
   if (warnings.length > 0) {
     console.log(chalk.yellow.bold('⚠️  Fix these issues first:'));
     warnings.forEach(w => console.log(`   ${chalk.yellow('•')} ${w}`));

@@ -6,7 +6,7 @@
 # AUTH_URL=http://localhost:3456. Nobody outside the container sees Node.
 # =============================================================================
 
-# -- Build arg: python | go | rust | ruby
+# -- Build arg: python | node | go | rust | ruby
 ARG BACKEND_LANG={{BACKEND_LANG}}
 
 # =============================================================================
@@ -77,6 +77,11 @@ COPY Gemfile Gemfile.lock ./
 RUN bundle install --without development test
 COPY {{BACKEND_SRC}} {{BACKEND_SRC}}
 # {{/if_ruby}}
+# {{#if_node}}
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY . .
+# {{/if_node}}
 
 # =============================================================================
 # Stage 4: Runtime config

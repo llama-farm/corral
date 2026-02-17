@@ -35,11 +35,23 @@ export async function configEditCommand(opts: { json?: boolean; config: string }
     jsonOutput({ action: 'edit', config: opts.config }, true);
     return;
   }
+
   info(`Opening ${opts.config} in your editor`);
+
+  // Prefer explicit editor if set
+  const editor = process.env.VISUAL || process.env.EDITOR;
+  const cmd = editor
+    ? `${editor} ${opts.config}`
+    : process.platform === 'darwin'
+      ? `open ${opts.config}`
+      : process.platform === 'win32'
+        ? `start "" ${opts.config}`
+        : `xdg-open ${opts.config}`;
+
   try {
-    execSync(`open ${opts.config}`, { stdio: 'inherit' });
+    execSync(cmd, { stdio: 'inherit' });
   } catch {
-    info(`Could not open editor. Edit ${opts.config} manually.`);
+    info(`Could not open editor automatically. Edit ${opts.config} manually.`);
   }
 }
 

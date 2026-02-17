@@ -16,6 +16,7 @@ import { analyzeCommand } from './commands/analyze.js';
 import { validateCommand } from './commands/validate.js';
 import { rollbackCommandHandler } from './commands/rollback.js';
 import { addCommand } from './commands/add.js';
+import { deployCommand } from './commands/deploy.js';
 
 const program = new Command();
 
@@ -43,6 +44,25 @@ program.command('init')
     }
     return initCommand({ ...opts(), ...cmdOpts });
   });
+
+const deployCmd = program.command('deploy').description('Generate deployment templates');
+
+deployCmd.command('docker')
+  .description('Generate Dockerfile + docker-compose.yml + nginx.conf + supervisord.conf')
+  .action(() => deployCommand('docker'));
+
+deployCmd.command('fly')
+  .description('Generate fly.toml + Dockerfile')
+  .option('--region <region>', 'Fly region (default: iad)', 'iad')
+  .action((cmdOpts) => deployCommand('fly', cmdOpts));
+
+deployCmd.command('railway')
+  .description('Generate railway.json + Dockerfile')
+  .action(() => deployCommand('railway'));
+
+deployCmd.command('render')
+  .description('Generate render.yaml + Dockerfile')
+  .action(() => deployCommand('render'));
 
 program.command('dev')
   .description('Start the Corral dev server')

@@ -44,6 +44,9 @@ command=/app/backend
 ; {{#if_ruby}}
 command=bundle exec {{RUBY_CMD}}
 ; {{/if_ruby}}
+; {{#if_node}}
+command=npm start
+; {{/if_node}}
 directory=/app
 environment=PORT="8000",AUTH_URL="http://localhost:3456",CORRAL_DB_PATH="/app/data/corral.db"
 autorestart=true

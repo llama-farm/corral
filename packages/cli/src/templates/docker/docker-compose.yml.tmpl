@@ -24,7 +24,12 @@ services:
     volumes:
       # Hot-reload: mount source code
       - ./server:/app/server
-      - ./{{{BACKEND_SRC}}}:/app/{{BACKEND_SRC}}
+      # {{#if_node}}
+      - ./:/app
+      # {{/if_node}}
+      # {{#unless_if_node}}
+      - ./{{BACKEND_SRC}}:/app/{{BACKEND_SRC}}
+      # {{/unless_if_node}}
       # Persistent SQLite data
       - corral_data:/app/data
       # Avoid overwriting node_modules

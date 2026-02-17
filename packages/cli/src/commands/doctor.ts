@@ -9,6 +9,20 @@ interface Check {
   detail?: string;
 }
 
+const CHECKLIST_LABELS: Record<string, string> = {
+  auth_provider_wrapped: 'Wrap app in AuthProvider',
+  account_menu_added: 'Add AccountMenu to navbar',
+  profile_route_added: 'Add /profile route with ProfilePage',
+  admin_route_added: 'Add /admin route with AdminPanel (admin gated)',
+  plan_gates_added: 'Add PlanGate around premium features',
+  upgrade_banner_added: 'Add UpgradeBanner for free users',
+  stripe_checkout_wired: 'Wire Stripe checkout to /api/corral/checkout',
+  stripe_portal_wired: 'Wire Stripe billing portal to /api/corral/billing-portal',
+  signin_page_added: 'Add sign-in/sign-up pages',
+  doctor_passed: 'Run corral doctor successfully',
+  stripe_synced: 'Run corral stripe sync',
+};
+
 export async function doctorCommand(opts: { json?: boolean; config: string; url?: string }) {
   const checks: Check[] = [];
   const baseUrl = opts.url || process.env.BETTER_AUTH_URL || 'http://localhost:3000';
@@ -302,6 +316,39 @@ export async function doctorCommand(opts: { json?: boolean; config: string; url?
   } else {
     checks.push({ name: 'CORRAL.md (agent discovery)', status: 'suggestion', detail: 'Run corral init to generate' });
     info('No CORRAL.md — agents won\'t auto-discover Corral config');
+  }
+
+  // ─── 11. Agent checklist progress ──────────────────────────────────
+  const checklistPath = '.corral/agent-checklist.json';
+  if (existsSync(checklistPath)) {
+    try {
+      const raw = JSON.parse(readFileSync(checklistPath, 'utf-8'));
+      const checklist = raw?.checklist || {};
+      const pending = Object.entries(checklist)
+        .filter(([, done]) => done !== true)
+        .map(([key]) => CHECKLIST_LABELS[key] || key);
+
+      if (pending.length === 0) {
+        checks.push({ name: 'Agent checklist status', status: 'pass', detail: 'All integration checklist items completed' });
+        success('Agent checklist complete ✓');
+      } else {
+        checks.push({
+          name: 'Agent checklist status',
+          status: 'warn',
+          detail: `Uncompleted items (${pending.length}): ${pending.join('; ')}`,
+        });
+        warn(`Agent checklist has ${pending.length} uncompleted item(s):`);
+        for (const item of pending) {
+          console.log(chalk.yellow(`  - ${item}`));
+        }
+      }
+    } catch (e: any) {
+      checks.push({ name: 'Agent checklist status', status: 'warn', detail: `Invalid JSON in ${checklistPath}` });
+      warn(`Could not parse ${checklistPath}: ${e?.message || 'invalid json'}`);
+    }
+  } else {
+    checks.push({ name: 'Agent checklist status', status: 'suggestion', detail: 'Run corral init to generate .corral/agent-checklist.json' });
+    info('No .corral/agent-checklist.json — run corral init');
   }
 
   // ─── Summary ────────────────────────────────────────────────────────

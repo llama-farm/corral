@@ -15,7 +15,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 // ─── Auth hook from Corral-generated auth-context ─────────────────
 import { useAuth } from '@/auth-context';
@@ -26,7 +26,6 @@ type Step = 'loading' | 'login' | 'authorize' | 'done' | 'denied' | 'error';
 function DeviceVerifyInner() {
   const searchParams = useSearchParams();
   const userCode = searchParams.get('code') || '';
-  const router = useRouter();
 
   // ─── ADAPT TO YOUR AUTH HOOK ──────────────────────────────────
   // For Better Auth:
@@ -97,7 +96,7 @@ function DeviceVerifyInner() {
         <div className="device-card">
           <h2>⚠️ Invalid link</h2>
           <p className="error">{error}</p>
-          <p className="muted">Run <code>[[APP_NAME]] login</code> to start a new auth flow.</p>
+          <p className="muted">Run <code>{{APP_NAME}} login</code> to start a new auth flow.</p>
         </div>
       </div>
     );
@@ -136,7 +135,7 @@ function DeviceVerifyInner() {
             <span className="icon">🔐</span>
             <h2>Sign in to authorize device</h2>
             <p className="muted">
-              <strong>[[APP_NAME]]</strong> CLI is requesting access to your account.
+              <strong>{{APP_NAME}}</strong> CLI is requesting access to your account.
             </p>
             {userCode && (
               <div className="device-code">{userCode}</div>
@@ -188,7 +187,7 @@ function DeviceVerifyInner() {
           <span className="icon">🔐</span>
           <h2>Authorize this device?</h2>
           <p className="muted">
-            <strong>[[APP_NAME]]</strong> CLI is requesting access to your account
+            <strong>{{APP_NAME}}</strong> CLI is requesting access to your account
           </p>
         </div>
 
@@ -212,7 +211,7 @@ function DeviceVerifyInner() {
 
         {/* Permissions */}
         <div className="permissions">
-          <p className="permissions-title">[[APP_NAME]] CLI will be able to:</p>
+          <p className="permissions-title">{{APP_NAME}} CLI will be able to:</p>
           <ul>
             <li>Access your account info and plan</li>
             <li>Run CLI commands on your behalf</li>
