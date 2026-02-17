@@ -3,9 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Integration — Corral Docs</title>
-  <meta name="description" content="How AI agents use Corral: llms.txt, CORRAL.md, --json CLI, and the 9-command workflow.">
+  <title>Agent Integration — Corral Agent-Native Auth + Payments</title>
+  <meta name="description" content="How AI coding agents (OpenClaw, Claude Code, Codex, Cursor, Windsurf) use Corral to add agent-native auth + payments to any app. llms.txt, CORRAL.md, --json CLI, example prompts, full workflow.">
+  <meta property="og:title" content="Corral for AI Agents — Auth + Payments in One Conversation">
+  <meta property="og:description" content="Point your AI coding agent at Corral. It reads llms.txt, runs the CLI, and adds login, Stripe billing, and feature gating to your app. Works with OpenClaw, Claude Code, Codex, Cursor, and more.">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .agent-row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 0;
+      border: 1px solid var(--bg-border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .agent-row-header {
+      background: var(--bg-card);
+      padding: 20px;
+      border-right: 1px solid var(--bg-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .agent-row-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .agent-row-tag {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      background: rgba(99,102,241,0.15);
+      color: #a5b4fc;
+      border-radius: 10px;
+    }
+    .agent-row-body {
+      padding: 20px 24px;
+    }
+    .agent-row-body h4 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .agent-row-body .prompt-box {
+      background: #0d1117;
+      border: 1px solid var(--bg-border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.83rem;
+      color: #f9a8d4;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+    .agent-row-body .context-box {
+      background: #0d1117;
+      border: 1px solid var(--bg-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #93c5fd;
+      margin-top: 8px;
+    }
+    .agent-row-body p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 600px) {
+      .agent-row { grid-template-columns: 1fr; }
+      .agent-row-header { border-right: none; border-bottom: 1px solid var(--bg-border); flex-direction: row; justify-content: flex-start; padding: 12px 16px; }
+    }
+    .conversation-block {
+      background: #0d1117;
+      border: 1px solid var(--bg-border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      font-size: 0.875rem;
+      line-height: 1.7;
+    }
+    .conversation-block .msg { margin-bottom: 12px; }
+    .conversation-block .msg-human { color: #f9a8d4; }
+    .conversation-block .msg-agent { color: #86efac; }
+    .conversation-block .msg-tool  { color: #93c5fd; padding-left: 20px; font-family: var(--font-mono); font-size: 0.8rem; }
+    .conversation-block .msg-done  { color: #fde68a; font-weight: 600; }
+    .conversation-block .msg-label { font-weight: 700; margin-right: 8px; }
+  </style>
 </head>
 <body class="page-body">
 
@@ -34,13 +126,17 @@
     <div class="sidebar-section">
       <div class="sidebar-section-title">On This Page</div>
       <ul class="sidebar-nav">
-        <li><a href="#design-goals">Design Goals</a></li>
-        <li><a href="#llms-txt">llms.txt</a></li>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#give-context">Give Your Agent Context</a></li>
+        <li><a href="#supported-agents">Supported Agents</a></li>
+        <li><a href="#example-prompts">Example Prompts</a></li>
+        <li><a href="#example-conversation">Full Conversation</a></li>
         <li><a href="#corral-md">CORRAL.md</a></li>
         <li><a href="#json-output">--json Output</a></li>
         <li><a href="#nine-commands">9-Command Workflow</a></li>
-        <li><a href="#idempotent">Idempotent Commands</a></li>
+        <li><a href="#idempotent">Idempotency</a></li>
         <li><a href="#mcp">MCP Integration</a></li>
+        <li><a href="#design-goals">Design Goals</a></li>
       </ul>
     </div>
     <div class="sidebar-section">
@@ -56,140 +152,346 @@
   <main class="docs-content">
     <h1>Agent Integration</h1>
     <p class="docs-lead">
-      Corral is designed to be used by AI agents, not just humans.
-      Every decision — CLI output format, command structure, file generation —
-      is made with agents as the primary consumer.
+      Corral is built <em>for</em> AI coding agents. Point your agent here, tell it what
+      you need, and it adds login, Stripe billing, and feature gating to your app —
+      in one conversation, with no human touching auth code.
     </p>
 
-    <!-- ── Design Goals ─────────────────────────────── -->
-    <h2 id="design-goals">Design Goals</h2>
-    <p>The agent-native design has four principles:</p>
-    <ol>
-      <li><strong>Discover without reading docs</strong> — <code>/api/llms.txt</code> and <code>CORRAL.md</code> give agents everything they need about a specific project.</li>
-      <li><strong>Parse without screen-scraping</strong> — Every command has <code>--json</code> mode with consistent structure and exit codes.</li>
-      <li><strong>Act without side effects</strong> — <code>corral analyze</code> and <code>--dry-run</code> flags let agents understand state before making changes.</li>
-      <li><strong>Recover without human help</strong> — <code>corral doctor</code> diagnoses problems and suggests fixes; <code>corral rollback</code> undoes changes.</li>
-    </ol>
-
-    <!-- ── llms.txt ─────────────────────────────────── -->
-    <h2 id="llms-txt">llms.txt</h2>
-    <p>
-      Every Corral app automatically serves an <code>llms.txt</code> at
-      <code>/api/llms.txt</code>. It follows the
-      <a href="https://llmstxt.org" target="_blank" rel="noopener">llms.txt spec</a>
-      and describes the app's specific Corral configuration.
-    </p>
-    <p>
-      An agent reading this file knows:
-    </p>
-    <ul>
-      <li>What the app is called and what it does</li>
-      <li>Which auth providers are configured</li>
-      <li>What plans and features exist</li>
-      <li>What API endpoints are available</li>
-      <li>How to authenticate requests</li>
-      <li>What usage limits apply per plan</li>
-    </ul>
-
-    <div class="code-block">
-      <div class="code-block-header"><span class="code-filename">GET /api/llms.txt — example output for HORIZON</span><span class="code-lang">text</span></div>
-      <pre><code># HORIZON
-
-> Military intelligence analysis dashboard.
-> Auth + billing provided by Corral (https://corralauth.dev).
-
-## Auth
-
-Sign in with Google or email magic link.
-Session cookie: corral-session (HttpOnly, SameSite=Lax)
-Bearer token: Authorization: Bearer &lt;token&gt; (for API access)
-
-POST /api/auth/sign-in/email    — start magic link
-POST /api/auth/sign-in/social   — OAuth redirect (provider=google)
-GET  /api/auth/session          — get current session (JSON)
-POST /api/auth/sign-out         — sign out
-
-## Plans
-
-- free ($0/mo): basic_search, export_csv
-  - API calls: 500/month (block on overage)
-  - Export rows: 1,000/month
-
-- pro ($49/mo, 14-day trial): +ai_analysis, real_time_feed
-  - API calls: 10,000/month (block on overage)
-  - Export rows: 100,000/month
-
-- enterprise (custom): +bulk_export, dedicated support
-
-## API
-
-All API endpoints require authentication unless noted.
-Base URL: https://horizon.mil/api
-
-GET  /api/auth/session       — { user, plan, features, limits }
-POST /api/billing/checkout   — { plan } → { url }
-GET  /api/billing/portal     — → Stripe Customer Portal
-
-POST /api/billing/device/authorize  — start device auth flow
-POST /api/billing/device/token      — poll for device token
-
-## Feature Gates
-
-ai_analysis   — plans: pro, enterprise  — gate: blur
-real_time_feed — plans: pro, enterprise — gate: skeleton
-bulk_export    — plans: enterprise      — gate: block
-admin_console  — roles: admin           — gate: hide
-
-## Upgrade
-
-Redirect users to /pricing or POST /api/billing/checkout with { plan: "pro" }
-
-## More
-
-- Full docs: https://horizon.mil/docs
-- llms-full.txt: https://horizon.mil/api/llms-full.txt</code></pre>
+    <div class="callout info">
+      <div class="callout-title">TL;DR for agents</div>
+      Read <a href="llms.txt">llms.txt</a> or <a href="llms-full.txt">llms-full.txt</a>, run
+      <code>npx create-corral init</code>, edit <code>corral.yaml</code>, run
+      <code>npx create-corral validate</code>. Done. The app has auth + payments.
     </div>
 
-    <h3>Generate llms.txt</h3>
+    <!-- ── Overview ─────────────────────────────────── -->
+    <h2 id="overview">Why Corral is Agent-Native</h2>
     <p>
-      You can generate or preview the <code>llms.txt</code> without running the app:
+      Auth + billing integration is one of the hardest things for AI agents to get right
+      with traditional libraries. Too many files, too many wiring decisions, too much
+      tribal knowledge that lives in blog posts rather than docs.
     </p>
-    <div class="terminal">
-      <div class="terminal-bar">
-        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+    <p>
+      Corral solves this by making the entire auth + billing topology declarative:
+      one YAML file, one CLI, structured JSON output on every command.
+      An agent can read the spec, generate the config, and wire up an entire auth
+      stack without ambiguity.
+    </p>
+
+    <ul>
+      <li><strong>One spec to read</strong> — <code>llms.txt</code> or <code>llms-full.txt</code> covers everything</li>
+      <li><strong>One config to edit</strong> — <code>corral.yaml</code> is the single source of truth</li>
+      <li><strong>--json on every command</strong> — structured output, numeric exit codes, no screen-scraping</li>
+      <li><strong>CORRAL.md after init</strong> — project-specific guide the agent reads for subsequent changes</li>
+      <li><strong>Idempotent commands</strong> — safe to re-run on failure; agents can retry without side effects</li>
+      <li><strong>Self-diagnosing errors</strong> — every error JSON includes a <code>"fix"</code> field telling the agent exactly what to do</li>
+    </ul>
+
+    <!-- ── Give Your Agent Context ──────────────────── -->
+    <h2 id="give-context">Give Your Agent Corral Context</h2>
+    <p>
+      Before your agent can use Corral, it needs to know Corral exists and what it does.
+      Here are the four ways to give your agent that context, depending on your setup:
+    </p>
+
+    <h3>Option 1: Paste the llms.txt URL (any agent)</h3>
+    <p>
+      The simplest approach. Just include the URL in your prompt:
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">prompt</span></div>
+      <pre><code>Read https://corralauth.dev/llms.txt then add auth and Stripe billing to this app.
+Free tier and Pro at $29/mo. Use Google login.</code></pre>
+    </div>
+
+    <h3>Option 2: Add to AGENTS.md (Claude Code / OpenClaw)</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">AGENTS.md</span><span class="code-lang">markdown</span></div>
+      <pre><code>## Auth + Payments
+
+This project uses Corral for auth, Stripe billing, and feature gating.
+Corral spec: https://corralauth.dev/llms.txt
+Full reference: https://corralauth.dev/llms-full.txt
+
+When asked to add auth or payments:
+1. Read CORRAL.md (if it exists) for project-specific context
+2. Otherwise, run: npx create-corral init
+3. Edit corral.yaml with the requested plans/features
+4. Run: corral validate --json</code></pre>
+    </div>
+
+    <h3>Option 3: Add to .cursorrules (Cursor)</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">.cursorrules</span><span class="code-lang">text</span></div>
+      <pre><code>## Auth + Payments (Corral)
+
+This project uses Corral for auth + Stripe billing.
+Read https://corralauth.dev/llms.txt for the full spec.
+
+- All auth/billing config lives in corral.yaml
+- To add a feature gate: corral add feature &lt;name&gt; --plans &lt;list&gt; --gate &lt;mode&gt;
+- To add a plan: corral add plan &lt;name&gt; --price &lt;n&gt;
+- To sync Stripe: corral stripe push --json
+- To validate: corral validate --json (exit 0 = deploy-ready)</code></pre>
+    </div>
+
+    <h3>Option 4: OpenClaw Skill (first-class support)</h3>
+    <p>
+      Corral ships as an OpenClaw skill. When installed, OpenClaw knows Corral's
+      full CLI, understands the YAML schema, and can make changes interactively
+      as you describe what you want.
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code><span class="tok-comment"># Install the Corral skill in OpenClaw</span>
+openclaw skill add corral
+
+<span class="tok-comment"># Then just tell OpenClaw what you want:</span>
+<span class="tok-comment"># "Add Google auth and a $29/mo Pro plan with AI features gated"</span></code></pre>
+    </div>
+
+    <!-- ── Supported Agents ──────────────────────────── -->
+    <h2 id="supported-agents">Supported Agents</h2>
+    <p>
+      Any agent that can run shell commands and read markdown can use Corral.
+      Here's how to set up each major agent:
+    </p>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">🦙</span>
+        <div class="agent-row-name">OpenClaw</div>
+        <div class="agent-row-tag">First-class</div>
       </div>
-      <div class="terminal-body">
-        <span class="terminal-line cmd">corral llms-txt</span>
-        <span class="terminal-line output"># HORIZON</span>
-        <span class="terminal-line output">...</span>
-        <span class="terminal-line blank"></span>
-        <span class="terminal-line cmd">corral llms-txt --output public/llms.txt</span>
-        <span class="terminal-line success">Written to public/llms.txt</span>
+      <div class="agent-row-body">
+        <p>Native Corral skill. OpenClaw knows the full CLI and YAML schema without needing llms.txt.</p>
+        <h4>Setup</h4>
+        <div class="context-box">openclaw skill add corral</div>
+        <p style="margin-top:8px">Or add to your workspace AGENTS.md — OpenClaw reads it on every session.</p>
+      </div>
+    </div>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">🤖</span>
+        <div class="agent-row-name">Claude Code</div>
+        <div class="agent-row-tag">Excellent</div>
+      </div>
+      <div class="agent-row-body">
+        <p>Point it at llms.txt and it handles everything. Best results with AGENTS.md context.</p>
+        <h4>Setup</h4>
+        <div class="context-box"># Add to AGENTS.md:
+Corral spec: https://corralauth.dev/llms.txt</div>
+        <h4>Or in your prompt</h4>
+        <div class="context-box">Read https://corralauth.dev/llms.txt then add auth + billing.</div>
+      </div>
+    </div>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">⚡</span>
+        <div class="agent-row-name">Codex</div>
+        <div class="agent-row-tag">Great</div>
+      </div>
+      <div class="agent-row-body">
+        <p>The <code>--json</code> flag on every command makes Codex integration seamless. No output parsing.</p>
+        <h4>Setup</h4>
+        <div class="context-box"># Add to AGENTS.md or pass in system prompt:
+Auth/payments: use Corral (https://corralauth.dev/llms.txt)
+Always use --json flag on corral commands.</div>
+      </div>
+    </div>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">🎯</span>
+        <div class="agent-row-name">Cursor</div>
+        <div class="agent-row-tag">Great</div>
+      </div>
+      <div class="agent-row-body">
+        <p>Add to <code>.cursorrules</code> for persistent context in every Cursor session on this project.</p>
+        <h4>Setup</h4>
+        <div class="context-box"># .cursorrules
+Auth + payments: Corral. Read https://corralauth.dev/llms.txt
+Config: corral.yaml | Validate: corral validate --json</div>
+      </div>
+    </div>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">🌊</span>
+        <div class="agent-row-name">Windsurf</div>
+        <div class="agent-row-tag">Good</div>
+      </div>
+      <div class="agent-row-body">
+        <p>Add Corral context to Windsurf's project rules or include in your system prompt.</p>
+        <h4>Setup</h4>
+        <div class="context-box"># Project rules / system prompt:
+This project uses Corral for auth + billing.
+Spec: https://corralauth.dev/llms.txt</div>
+      </div>
+    </div>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">⌨️</span>
+        <div class="agent-row-name">Aider</div>
+        <div class="agent-row-tag">Good</div>
+      </div>
+      <div class="agent-row-body">
+        <p>Use <code>/read</code> to add llms.txt or llms-full.txt to Aider's context. Include CORRAL.md after init.</p>
+        <h4>Setup</h4>
+        <div class="context-box">/read https://corralauth.dev/llms.txt
+/read CORRAL.md  # after corral init</div>
+      </div>
+    </div>
+
+    <div class="agent-row">
+      <div class="agent-row-header">
+        <span style="font-size:1.8rem">🔧</span>
+        <div class="agent-row-name">Any Agent</div>
+        <div class="agent-row-tag">Supported</div>
+      </div>
+      <div class="agent-row-body">
+        <p>If it can run CLI commands and read markdown, it can use Corral. Just provide the llms.txt URL.</p>
+        <h4>Universal setup</h4>
+        <div class="context-box">Read https://corralauth.dev/llms-full.txt for the Corral spec.
+All CLI commands support --json. Exit 0 = success, 1 = error.</div>
+      </div>
+    </div>
+
+    <!-- ── Example Prompts ───────────────────────────── -->
+    <h2 id="example-prompts">Example Prompts</h2>
+    <p>
+      These are prompts that work well with Corral-aware agents.
+      The more specific you are, the better the output.
+    </p>
+
+    <h3>Basic auth setup</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">prompt</span></div>
+      <pre><code>Add user authentication to this app using Corral.
+Email magic link + Google OAuth.
+After setup, validate with corral validate --json.</code></pre>
+    </div>
+
+    <h3>Full SaaS billing</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">prompt</span></div>
+      <pre><code>Add auth and Stripe billing to this app using Corral.
+
+Plans:
+- Free: $0/mo — basic features, 500 API calls/month
+- Pro: $29/mo — all features, 10k API calls/month, 14-day trial
+
+Auth: Google OAuth + email magic link
+
+Gate the "ai_analysis" feature to Pro plan with blur effect.
+
+After setup run corral validate --json and show me the output.</code></pre>
+    </div>
+
+    <h3>Adding a feature gate</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">prompt</span></div>
+      <pre><code>Read CORRAL.md then add a feature gate for "advanced_export".
+Available on Pro and Enterprise plans. Use "block" gate mode.
+Run corral validate --json when done.</code></pre>
+    </div>
+
+    <h3>Adding a new plan</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">prompt</span></div>
+      <pre><code>Add an "Enterprise" plan to Corral at $199/mo (annual only).
+It should include all Pro features plus "sso" and "audit_log".
+Sync to Stripe after. Show me the Stripe product IDs.</code></pre>
+    </div>
+
+    <!-- ── Full Conversation ─────────────────────────── -->
+    <h2 id="example-conversation">Full Example Conversation</h2>
+    <p>
+      Here's what it looks like when a human asks an agent to add auth with
+      Google login and a $29/mo Pro plan:
+    </p>
+
+    <div class="conversation-block">
+      <div class="msg msg-human">
+        <span class="msg-label">You:</span>
+        Add auth to this Next.js app. I want Google login and email magic links.
+        Free tier and Pro at $29/mo. Pro users get access to the AI dashboard feature.
+        Use Corral — read https://corralauth.dev/llms.txt first.
+      </div>
+
+      <div class="msg msg-agent">
+        <span class="msg-label">Agent:</span>
+        Reading Corral spec from llms.txt...
+      </div>
+
+      <div class="msg msg-tool">→ fetch https://corralauth.dev/llms.txt</div>
+      <div class="msg msg-tool">← [full spec loaded, 9-command workflow understood]</div>
+
+      <div class="msg msg-agent">
+        <span class="msg-label">Agent:</span>
+        Got it. Analyzing the project first, then scaffolding Corral.
+      </div>
+
+      <div class="msg msg-tool">→ corral analyze --json</div>
+      <div class="msg msg-tool">← { "framework": "nextjs", "router": "app", "db": "prisma", "corral_installed": false }</div>
+
+      <div class="msg msg-tool">→ corral init --yes --json</div>
+      <div class="msg msg-tool">← { "files_created": ["corral.yaml", "src/app/api/auth/[...corral]/route.ts", "CORRAL.md", ...] }</div>
+
+      <div class="msg msg-tool">→ corral add provider google --json</div>
+      <div class="msg msg-tool">← { "status": "ok", "result": { "provider": "google" } }</div>
+
+      <div class="msg msg-tool">→ corral add provider email --magic-link --json</div>
+      <div class="msg msg-tool">← { "status": "ok", "result": { "provider": "email", "magic_link": true } }</div>
+
+      <div class="msg msg-tool">→ corral add plan pro --price 29 --trial 14 --json</div>
+      <div class="msg msg-tool">← { "status": "ok", "result": { "plan": "pro", "price": 29 } }</div>
+
+      <div class="msg msg-tool">→ corral add feature ai_dashboard --plans pro --gate blur --json</div>
+      <div class="msg msg-tool">← { "status": "ok", "result": { "feature": "ai_dashboard", "gate": "blur" } }</div>
+
+      <div class="msg msg-tool">→ corral stripe push --json</div>
+      <div class="msg msg-tool">← { "status": "ok", "result": { "prices": { "pro": "price_1Ov9mR2xK9mN" } } }</div>
+
+      <div class="msg msg-tool">→ corral validate --strict --json</div>
+      <div class="msg msg-tool">← { "status": "ok", "checks": { "all": "pass" }, "errors": [] }</div>
+
+      <div class="msg msg-done">
+        <span class="msg-label">Agent:</span>
+        Done. Here's what was set up:
+
+        ✓ Google OAuth + email magic link configured
+        ✓ Free plan (unlimited) + Pro plan ($29/mo, 14-day trial)
+        ✓ AI Dashboard feature gated to Pro with blur effect
+        ✓ Stripe plans synced (Pro price ID: price_1Ov9mR2xK9mN)
+        ✓ All validation checks pass
+
+        Next steps:
+        - Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.local
+        - Add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to .env.local
+        - Test at localhost:3000/login
       </div>
     </div>
 
     <!-- ── CORRAL.md ────────────────────────────────── -->
-    <h2 id="corral-md">CORRAL.md</h2>
+    <h2 id="corral-md">CORRAL.md — The Project Guide</h2>
     <p>
-      <code>CORRAL.md</code> is a project-specific guide generated at
-      <code>corral init</code> time and updated by every <code>corral add</code>.
-      It lives in the project root and is designed to be included in an agent's
-      system prompt or context window.
+      After <code>corral init</code>, a <code>CORRAL.md</code> file is created in
+      your project root. This file is designed to be included in your agent's
+      context for all subsequent Corral-related changes.
     </p>
     <p>
-      It answers the questions an agent needs to make changes to Corral config:
+      <strong>Tell your agent to read CORRAL.md</strong> before making any auth
+      or billing changes. It contains project-specific paths, active features,
+      active plans, and common commands — exactly what an agent needs.
     </p>
-    <ul>
-      <li>What framework is this? What adapter is installed?</li>
-      <li>Where are the route handlers?</li>
-      <li>What features and plans are active?</li>
-      <li>What commands should I run to add X?</li>
-      <li>How do I test auth locally?</li>
-    </ul>
 
     <div class="code-block">
-      <div class="code-block-header"><span class="code-filename">CORRAL.md — example for HORIZON</span><span class="code-lang">markdown</span></div>
-      <pre><code># Corral in HORIZON
+      <div class="code-block-header"><span class="code-filename">CORRAL.md — example for a Next.js app</span><span class="code-lang">markdown</span></div>
+      <pre><code># Corral in MySaaSApp
 
 Corral v0.1.0 · Next.js 14 (App Router) · PostgreSQL (Prisma)
 
@@ -199,26 +501,20 @@ Corral v0.1.0 · Next.js 14 (App Router) · PostgreSQL (Prisma)
 - Billing handler: src/app/api/billing/[...corral]/route.ts
 - Admin page:      src/app/admin/page.tsx
 - Login page:      /api/auth/signin (auto-generated)
-- Device verify:   /auth/activate
 
 ## Active Features
 
 | Feature       | Plans                  | Gate     |
 |---------------|------------------------|----------|
-| basic_search  | free, pro, enterprise  | (none)   |
-| export_csv    | free, pro, enterprise  | (none)   |
-| ai_analysis   | pro, enterprise        | blur     |
-| real_time_feed| pro, enterprise        | skeleton |
-| bulk_export   | enterprise             | block    |
-| admin_console | role:admin             | hide     |
+| basic_access  | free, pro              | (none)   |
+| ai_dashboard  | pro                    | blur     |
 
 ## Active Plans
 
 | Plan        | Price | Stripe Product     |
 |-------------|-------|--------------------|
 | free        | $0    | (none)             |
-| pro         | $49   | prod_R2xK9mN2aLp   |
-| enterprise  | custom| (manual invoicing) |
+| pro         | $29   | prod_R2xK9mN2aLp   |
 
 ## Adding a new feature
 
@@ -238,26 +534,26 @@ npm run dev
 ## Environment variables required
 
 CORRAL_SECRET, DATABASE_URL, STRIPE_SECRET_KEY,
-STRIPE_WEBHOOK_SECRET, GOOGLE_CLIENT_ID,
-GOOGLE_CLIENT_SECRET, SMTP_URL</code></pre>
+STRIPE_WEBHOOK_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SMTP_URL</code></pre>
     </div>
 
     <h3>Keep CORRAL.md current</h3>
     <div class="code-block">
       <div class="code-block-header"><span class="code-lang">bash</span></div>
-      <pre><code><span class="tok-comment"># After any corral add command, CORRAL.md is auto-updated</span>
-corral add feature threat_map --plans enterprise --gate block
-<span class="tok-comment"># CORRAL.md updated: threat_map row added to features table</span>
+      <pre><code><span class="tok-comment"># CORRAL.md is auto-updated after every corral add command</span>
+corral add feature advanced_export --plans pro --gate block
+<span class="tok-comment"># ↑ CORRAL.md updated: advanced_export row added to features table</span>
 
 <span class="tok-comment"># Force regenerate from current corral.yaml state:</span>
 corral llms-txt --update</code></pre>
     </div>
 
     <!-- ── --json Output ────────────────────────────── -->
-    <h2 id="json-output">--json Output</h2>
+    <h2 id="json-output">--json Flag — Structured Output for Agents</h2>
     <p>
       Every CLI command accepts <code>--json</code> and returns structured output.
       Exit code <code>0</code> = success, <code>1</code> = error with details.
+      Agents should always use <code>--json</code>.
     </p>
 
     <h3>Standard response envelope</h3>
@@ -272,7 +568,7 @@ corral llms-txt --update</code></pre>
   <span class="tok-string">"next_steps"</span>: [<span class="tok-string">"corral stripe push"</span>, <span class="tok-string">"corral validate"</span>]
 }
 
-<span class="tok-comment">// Error</span>
+<span class="tok-comment">// Error — always includes a "fix" field telling agents what to do</span>
 {
   <span class="tok-string">"status"</span>: <span class="tok-string">"error"</span>,
   <span class="tok-string">"command"</span>: <span class="tok-string">"corral validate"</span>,
@@ -296,7 +592,7 @@ corral llms-txt --update</code></pre>
     )
     data = json.<span class="tok-cmd">loads</span>(result.stdout)
     <span class="tok-keyword">if</span> result.returncode != <span class="tok-number">0</span>:
-        <span class="tok-keyword">raise</span> RuntimeError(data[<span class="tok-string">"error"</span>][<span class="tok-string">"message"</span>])
+        <span class="tok-keyword">raise</span> RuntimeError(f<span class="tok-string">"{data['error']['message']} — Fix: {data['error']['fix']}"</span>)
     <span class="tok-keyword">return</span> data
 
 <span class="tok-comment"># Agent workflow:</span>
@@ -312,7 +608,7 @@ result = <span class="tok-cmd">corral</span>(<span class="tok-string">"init"</sp
     <h2 id="nine-commands">The 9-Command Workflow</h2>
     <p>
       This is the canonical sequence an agent uses to add full auth + billing + gating
-      to a bare Next.js app like HORIZON. It's idempotent — run it twice and it's fine.
+      to a bare Next.js app. It's idempotent — run it twice and it's fine.
     </p>
 
     <div class="workflow-steps">
@@ -340,14 +636,14 @@ result = <span class="tok-cmd">corral</span>(<span class="tok-string">"init"</sp
       <div class="workflow-step">
         <div class="workflow-num">4</div>
         <div>
-          <div class="workflow-cmd">corral add plan pro --price 49 --json</div>
+          <div class="workflow-cmd">corral add plan pro --price 29 --json</div>
           <div class="workflow-what">Define paid plan. Updates corral.yaml only — Stripe sync happens in step 7.</div>
         </div>
       </div>
       <div class="workflow-step">
         <div class="workflow-num">5</div>
         <div>
-          <div class="workflow-cmd">corral add feature ai_analysis --plans pro --gate blur --json</div>
+          <div class="workflow-cmd">corral add feature ai_dashboard --plans pro --gate blur --json</div>
           <div class="workflow-what">Define a feature gate. YAML only — no code change needed.</div>
         </div>
       </div>
@@ -385,7 +681,7 @@ result = <span class="tok-cmd">corral</span>(<span class="tok-string">"init"</sp
     <div class="code-block">
       <div class="code-block-header"><span class="code-lang">bash</span></div>
       <pre><code><span class="tok-comment">#!/bin/bash
-# Agent: add Corral auth + billing to HORIZON</span>
+# Agent: add Corral auth + billing (run this after reading llms.txt)</span>
 set -e
 
 <span class="tok-comment"># 1. Understand the project</span>
@@ -395,10 +691,11 @@ echo "Framework: $(echo $ANALYSIS | jq -r '.result.framework')"
 <span class="tok-comment"># 2. Scaffold</span>
 corral init --yes --json | jq '.files_created[]'
 
-<span class="tok-comment"># 3-6. Add providers, plan, features, meters</span>
+<span class="tok-comment"># 3-6. Add providers, plans, features, meters</span>
 corral add provider google --json
-corral add plan pro --price 49 --trial 14 --json
-corral add feature ai_analysis --plans pro --gate blur --json
+corral add provider email --magic-link --json
+corral add plan pro --price 29 --trial 14 --json
+corral add feature ai_dashboard --plans pro --gate blur --json
 corral add meter api_calls --free 500 --pro 10000 --overage block --json
 
 <span class="tok-comment"># 7. Stripe sync</span>
@@ -412,10 +709,10 @@ corral validate --strict --json
 SEED=$(corral seed --count 1 --json)
 echo "Test user: $(echo $SEED | jq -r '.result.users[0].email')"
 
-echo "✓ Corral installed successfully"</code></pre>
+echo "✓ Auth + payments installed. Login at localhost:3000/login"</code></pre>
     </div>
 
-    <!-- ── Idempotent ────────────────────────────────── -->
+    <!-- ── Idempotency ───────────────────────────────── -->
     <h2 id="idempotent">Idempotency</h2>
     <p>
       All <code>corral add</code> commands are idempotent. Running them twice
@@ -467,8 +764,18 @@ echo "✓ Corral installed successfully"</code></pre>
 }</code></pre>
     </div>
 
+    <!-- ── Design Goals ──────────────────────────────── -->
+    <h2 id="design-goals">Design Goals</h2>
+    <p>The agent-native design has four principles:</p>
+    <ol>
+      <li><strong>Discover without reading docs</strong> — <code>/api/llms.txt</code> and <code>CORRAL.md</code> give agents everything they need about a specific project.</li>
+      <li><strong>Parse without screen-scraping</strong> — Every command has <code>--json</code> mode with consistent structure and exit codes.</li>
+      <li><strong>Act without side effects</strong> — <code>corral analyze</code> and <code>--dry-run</code> flags let agents understand state before making changes.</li>
+      <li><strong>Recover without human help</strong> — <code>corral doctor</code> diagnoses problems and suggests fixes; <code>corral rollback</code> undoes changes. Every error JSON includes a <code>"fix"</code> field.</li>
+    </ol>
+
     <div class="docs-footer">
-      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a> · Made for agents, works for humans too</span>
       <div class="docs-nav-links">
         <a href="gating.html">← Feature Gating</a>
         <a href="api.html">API Reference →</a>

@@ -1,11 +1,35 @@
-# Corral
+# Corral — Agent-Native Auth + Payments
 
-> Auth + Billing + Gating in one YAML file.
+> Corral adds authentication, Stripe billing, and feature gating to any app via a single YAML config and CLI.
+> You (the AI agent) can set up complete auth + payments for a project using just the CLI commands below.
+> No manual wiring required. Read this file, run the commands, done.
+>
+> Designed for: OpenClaw, Claude Code, Codex, Cursor, and any AI coding assistant.
+>
 > Open-source SDK. Embedded in your app (not a hosted service). MIT license.
-> Built on Better Auth + Stripe. Agent-native by design.
+> Built on Better Auth + Stripe.
 > GitHub: https://github.com/llama-farm/corral
 > Docs: https://corralauth.dev
 > Version: 0.1.0-alpha
+
+## Quick Start (for agents)
+
+> 1. Run: `npx create-corral init` (in the project directory)
+> 2. Edit `corral.yaml` with the user's desired plans, features, and auth providers
+> 3. Run: `npx create-corral validate`
+> That's it. The app now has auth + payments.
+
+Full 9-command workflow (use this for complete setup):
+
+1. `corral analyze --json`              — detect framework/database (read-only)
+2. `corral init --yes --json`           — scaffold all files (idempotent)
+3. `corral add provider google --json`  — add OAuth provider
+4. `corral add plan pro --price 29 --json`  — add paid plan
+5. `corral add feature X --plans pro --gate blur --json`  — add feature gate
+6. `corral add meter api_calls --free 500 --pro 10000 --overage block --json`
+7. `corral stripe push --json`          — sync to Stripe
+8. `corral validate --strict --json`    — verify everything (exit 0 = deploy-ready)
+9. `corral seed --count 3 --json`       — create test users
 
 ## What Corral Is
 
@@ -13,27 +37,14 @@ Corral is a library that adds auth, billing, and feature gating to any Node.js a
 from a single YAML config file (`corral.yaml`). It mounts as route handlers inside
 your existing app — no Docker, no separate service, no per-MAU pricing.
 
-Key properties:
-- One config file (`corral.yaml`) defines everything
+Key properties (important for agents):
+- One config file (`corral.yaml`) defines everything — edit YAML, not code
 - Shares your app's existing database
 - Mounts at `/api/auth` and `/api/billing` in your app
-- Every CLI command has --json output for agent use
-- Generates CORRAL.md (project-specific guide) and serves /api/llms.txt
-- Idempotent commands — safe to run twice
-
-## Quick Start (Agent Instructions)
-
-To add Corral to an existing app:
-
-1. `corral analyze --json`              — detect framework/database
-2. `corral init --yes --json`           — scaffold all files
-3. `corral add provider google --json`  — add OAuth provider
-4. `corral add plan pro --price 49 --json`  — add paid plan
-5. `corral add feature X --plans pro --gate blur --json`  — add feature gate
-6. `corral add meter api_calls --free 500 --pro 10000 --overage block --json`
-7. `corral stripe push --json`          — sync to Stripe
-8. `corral validate --strict --json`    — verify everything (exit 0 = OK)
-9. `corral seed --count 3 --json`       — create test users
+- Every CLI command has `--json` output for structured agent parsing
+- Generates `CORRAL.md` (project-specific guide) and serves `/api/llms.txt`
+- All `corral add` commands are idempotent — safe to run twice
+- Exit code 0 = success, 1 = error with JSON details and fix instructions
 
 ## corral.yaml Structure
 

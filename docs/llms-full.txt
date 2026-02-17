@@ -1,9 +1,36 @@
-# Corral — Full Reference (llms-full.txt)
+# Corral — Agent-Native Auth + Payments (Full Reference)
 
-> Extended version of llms.txt with full examples and detailed explanations.
-> For the concise version, see: https://corralauth.dev/llms.txt
+> You (the AI agent) can set up complete auth + payments for a project using this file.
+> No manual wiring required. Read this file, run the commands, done.
+>
+> Designed for: OpenClaw, Claude Code, Codex, Cursor, and any AI coding assistant.
+>
+> This is the extended reference with full examples. For the concise version: https://corralauth.dev/llms.txt
 > GitHub: https://github.com/llama-farm/corral
 > Version: 0.1.0-alpha
+
+## Quick Start (for agents)
+
+> 1. Run: `npx create-corral init` (in the project directory)
+> 2. Edit `corral.yaml` with the user's desired plans, features, and auth providers
+> 3. Run: `npx create-corral validate`
+> That's it. The app now has auth + payments.
+
+Full 9-command workflow:
+
+1. `corral analyze --json`                    — detect framework/database (read-only)
+2. `corral init --yes --json`                 — scaffold all files (idempotent)
+3. `corral add provider google --json`        — add OAuth provider
+4. `corral add plan pro --price 29 --json`    — add paid plan
+5. `corral add feature X --plans pro --gate blur --json`
+6. `corral add meter api_calls --free 500 --pro 10000 --overage block --json`
+7. `corral stripe push --json`                — sync to Stripe
+8. `corral validate --strict --json`          — verify everything (exit 0 = deploy-ready)
+9. `corral seed --count 3 --json`             — create test users
+
+All commands output `--json` with a standard envelope:
+- Success: `{ "status": "ok", "result": {...}, "next_steps": [...] }`
+- Error: `{ "status": "error", "error": { "code": "...", "message": "...", "fix": "..." } }`
 
 ---
 

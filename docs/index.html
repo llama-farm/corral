@@ -3,8 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Corral — Auth + Billing + Gating in one YAML file</title>
-  <meta name="description" content="Stop wiring auth to billing to gating. One config, one library, done. Built on Better Auth + Stripe.">
+  <title>Corral — Agent-Native Auth + Payments</title>
+  <meta name="description" content="Agent-native auth + payments. Point your AI coding agent at Corral, tell it what you need, and it adds login, billing, and feature gating to your app. Built for OpenClaw, Claude Code, Codex, and Cursor.">
+  <meta property="og:title" content="Corral — Agent-Native Auth + Payments">
+  <meta property="og:description" content="Tell your AI coding agent to add auth and payments. It reads Corral's llms.txt, runs 'npm create corral', and your app has login, Stripe billing, and feature gating. Built for OpenClaw, Claude Code, Codex, and Cursor.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://llama-farm.github.io/corral/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Corral — Agent-Native Auth + Payments">
+  <meta name="twitter:description" content="Auth + payments that AI agents can set up. One prompt, done.">
+  <meta name="keywords" content="agent-native, auth, payments, stripe, AI coding agent, OpenClaw, Claude Code, Codex, Cursor, authentication, billing, feature gating, SaaS, llms.txt">
   <link rel="stylesheet" href="css/style.css">
   <style>
     /* Landing-page specific overrides */
@@ -12,24 +20,14 @@
 
     /* Animated terminal lines */
     .anim-line { opacity: 0; animation: fadeInLine 0.3s forwards; }
-    .anim-line:nth-child(1)  { animation-delay: 0.1s; }
-    .anim-line:nth-child(2)  { animation-delay: 0.5s; }
-    .anim-line:nth-child(3)  { animation-delay: 0.7s; }
-    .anim-line:nth-child(4)  { animation-delay: 0.9s; }
-    .anim-line:nth-child(5)  { animation-delay: 1.1s; }
-    .anim-line:nth-child(6)  { animation-delay: 1.3s; }
-    .anim-line:nth-child(7)  { animation-delay: 1.5s; }
-    .anim-line:nth-child(8)  { animation-delay: 2.0s; }
-    .anim-line:nth-child(9)  { animation-delay: 2.2s; }
-    .anim-line:nth-child(10) { animation-delay: 2.4s; }
-    .anim-line:nth-child(11) { animation-delay: 2.6s; }
-    .anim-line:nth-child(12) { animation-delay: 2.8s; }
-    .anim-line:nth-child(13) { animation-delay: 3.0s; }
-    .anim-line:nth-child(14) { animation-delay: 3.4s; }
-    .anim-line:nth-child(15) { animation-delay: 3.6s; }
-    .anim-line:nth-child(16) { animation-delay: 3.8s; }
-    .anim-line:nth-child(17) { animation-delay: 4.0s; }
-    .anim-line:nth-child(18) { animation-delay: 4.2s; }
+    .anim-line:nth-child(1)  { animation-delay: 0.3s; }
+    .anim-line:nth-child(2)  { animation-delay: 1.0s; }
+    .anim-line:nth-child(3)  { animation-delay: 2.2s; }
+    .anim-line:nth-child(4)  { animation-delay: 2.6s; }
+    .anim-line:nth-child(5)  { animation-delay: 3.0s; }
+    .anim-line:nth-child(6)  { animation-delay: 3.4s; }
+    .anim-line:nth-child(7)  { animation-delay: 3.8s; }
+    .anim-line:nth-child(8)  { animation-delay: 4.4s; }
     @keyframes fadeInLine {
       from { opacity: 0; transform: translateY(4px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -41,6 +39,106 @@
       border-top: 1px solid var(--bg-border);
       margin: 0;
     }
+
+    /* Agent workflow steps */
+    .agent-workflow {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 32px;
+    }
+    .agent-workflow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--bg-border);
+      border-radius: 8px;
+    }
+    .agent-workflow-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .agent-workflow-text {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .agent-workflow-text strong {
+      color: var(--text);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    /* Agent compatibility grid */
+    .agent-compat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+    }
+    .agent-compat-card {
+      padding: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--bg-border);
+      border-radius: 8px;
+    }
+    .agent-compat-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .agent-compat-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Use case prose */
+    .use-case-prose {
+      max-width: 720px;
+      margin: 0 auto;
+      font-size: 1.05rem;
+      line-height: 1.8;
+      color: var(--text-muted);
+    }
+    .use-case-prose p + p {
+      margin-top: 20px;
+    }
+    .use-case-prose strong {
+      color: var(--text);
+    }
+
+    /* Agent badge in hero */
+    .hero-agent-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin-bottom: 16px;
+    }
+
+    /* Terminal user/agent lines */
+    .terminal-line.user { color: #f9a8d4; }
+    .terminal-line.agent { color: #86efac; }
+    .terminal-line.agent-cont { color: #93c5fd; padding-left: 16px; }
+    .terminal-line.done { color: #fde68a; font-weight: 600; }
   </style>
 </head>
 <body class="page-body">
@@ -72,62 +170,84 @@
 
 <!-- ── Hero ────────────────────────────────────────────────────── -->
 <section class="hero">
-  <div class="hero-eyebrow">
-    <span>🔓</span> Open Source · MIT License
+  <div class="hero-agent-badge">
+    🤖 Built for AI Coding Agents
   </div>
 
   <h1 class="hero-logo">
     <span class="logo-emoji">🦙</span>Corral
   </h1>
 
-  <p class="hero-tagline">Auth + Billing + Gating in one YAML file</p>
+  <p class="hero-tagline">Auth + Payments Your Agent Can Set Up</p>
 
   <p class="hero-subtitle">
-    Stop wiring auth to billing to gating. One config, one library, done.
-    Embedded in your app — no Docker, no separate service, no surprise bills.
+    Point your AI coding assistant at Corral. Tell it what you need.
+    Login, Stripe billing, feature gating — done in one conversation.
+  </p>
+
+  <p style="font-size:0.9rem;color:#a5b4fc;margin-top:-8px;margin-bottom:0">
+    Built for OpenClaw, Claude Code, Codex, and Cursor
   </p>
 
   <div class="hero-actions">
-    <a href="quickstart.html" class="btn btn-primary">
-      Get Started →
+    <a href="agents.html" class="btn btn-primary">
+      For Agents →
+    </a>
+    <a href="quickstart.html" class="btn btn-secondary">
+      Quickstart
     </a>
     <a href="https://github.com/llama-farm/corral" class="btn btn-secondary" target="_blank" rel="noopener">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
       </svg>
-      View on GitHub
+      GitHub
     </a>
   </div>
 
-  <!-- Terminal animation -->
+  <!-- Terminal animation — agent conversation -->
   <div class="hero-terminal">
     <div class="terminal">
       <div class="terminal-bar">
         <div class="terminal-dot red"></div>
         <div class="terminal-dot yellow"></div>
         <div class="terminal-dot green"></div>
-        <span class="terminal-title">~/projects/horizon</span>
+        <span class="terminal-title">~/projects/my-saas-app</span>
       </div>
       <div class="terminal-body">
-        <span class="terminal-line cmd anim-line">npx corral init</span>
-        <span class="terminal-line info anim-line">Analyzing project structure…</span>
-        <span class="terminal-line info anim-line">Detected: Next.js 14, PostgreSQL, TypeScript</span>
+        <span class="terminal-line user anim-line">You: "Add auth and Stripe billing to my app. Free tier and Pro at $29/mo."</span>
+        <span class="terminal-line agent anim-line">Agent: Reading llms.txt... Running npm create corral...</span>
+        <span class="terminal-line agent-cont anim-line">✓ corral.yaml configured</span>
+        <span class="terminal-line agent-cont anim-line">✓ Auth routes created</span>
+        <span class="terminal-line agent-cont anim-line">✓ Stripe plans synced</span>
+        <span class="terminal-line agent-cont anim-line">✓ Feature gates wired</span>
         <span class="terminal-line blank anim-line"></span>
-        <span class="terminal-line success anim-line">Created  corral.yaml</span>
-        <span class="terminal-line success anim-line">Created  src/app/api/auth/[...corral]/route.ts</span>
-        <span class="terminal-line success anim-line">Created  src/app/api/billing/[...corral]/route.ts</span>
-        <span class="terminal-line success anim-line">Created  src/components/corral/ (4 components)</span>
-        <span class="terminal-line success anim-line">Created  CORRAL.md</span>
-        <span class="terminal-line blank anim-line"></span>
-        <span class="terminal-line cmd anim-line">corral validate</span>
-        <span class="terminal-line success anim-line">Config syntax valid</span>
-        <span class="terminal-line success anim-line">Auth providers configured: google, email</span>
-        <span class="terminal-line success anim-line">Plans valid: free, pro, enterprise</span>
-        <span class="terminal-line success anim-line">Feature gates valid: 12 features across 3 plans</span>
-        <span class="terminal-line success anim-line">Stripe products synced: 3/3</span>
-        <span class="terminal-line success anim-line">All checks passed ✓</span>
+        <span class="terminal-line done anim-line">Done. Login at localhost:3000/login</span>
       </div>
     </div>
+  </div>
+</section>
+
+<hr class="section-sep">
+
+<!-- ── The Use Case ────────────────────────────────────────────── -->
+<section class="section">
+  <p class="section-label">The Problem</p>
+  <h2 class="section-title">The part where AI-built apps always break</h2>
+
+  <div class="use-case-prose">
+    <p>
+      You're building a SaaS app with an AI coding agent. It handles the UI, the API, the database.
+      Then you say <strong>"add auth and payments."</strong> That's where everything breaks —
+      wiring auth to billing to feature flags is the messiest part of any app.
+    </p>
+    <p>
+      <strong>Corral fixes this.</strong> One YAML config. One CLI. Your agent reads the spec,
+      generates the code, and it all just works. Login, signup, social auth, Stripe subscriptions,
+      feature gating, usage meters, admin dashboard — <strong>configured, not coded.</strong>
+    </p>
+    <p>
+      No human touches auth code. No auth docs get read. The agent handles everything.
+    </p>
   </div>
 </section>
 
@@ -136,20 +256,39 @@
 <!-- ── Features ────────────────────────────────────────────────── -->
 <section class="section">
   <p class="section-label">Why Corral</p>
-  <h2 class="section-title">Everything auth-shaped in one place</h2>
+  <h2 class="section-title">Built for the agent-first world</h2>
   <p class="section-desc">
-    Auth, billing, and feature gating are always three separate systems.
-    Corral makes them one.
+    Auth, billing, and feature gating as a single agent-readable spec.
   </p>
 
   <div class="feature-grid">
     <div class="feature-card">
-      <span class="feature-icon">📄</span>
-      <div class="feature-title">One Config</div>
+      <span class="feature-icon">🤖</span>
+      <div class="feature-title">Agent-Native</div>
       <p class="feature-desc">
-        <code>corral.yaml</code> defines your auth providers, plans, features, and
-        usage meters. Edit the YAML, everything updates — no code changes needed
-        for new plans or features.
+        Your agent reads <code>llms.txt</code>, understands every endpoint, and adds auth
+        in 9 CLI commands. No docs to read. No Stack Overflow. Just tell it what you want.
+        Every command outputs <code>--json</code>. Built for OpenClaw, Claude Code, Codex, and Cursor.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">📄</span>
+      <div class="feature-title">One YAML, Everything</div>
+      <p class="feature-desc">
+        <code>corral.yaml</code> defines auth providers, plans, features, and meters.
+        Your agent edits it, everything updates. Add a plan, add a feature gate, change
+        Stripe pricing — one file, zero wiring. Humans can read it too.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feature-icon">⚡</span>
+      <div class="feature-title">Works in Minutes, Not Days</div>
+      <p class="feature-desc">
+        Traditional auth setup: 2–3 days of wiring. With Corral + your agent: one conversation.
+        Login, billing, gating, admin dashboard — all generated. Ship the actual product,
+        not auth plumbing.
       </p>
     </div>
 
@@ -160,26 +299,6 @@
         Mounts as route handlers inside <em>your</em> app. Same database,
         same process, same deploy. No Docker. No separate service. No per-MAU
         pricing surprises.
-      </p>
-    </div>
-
-    <div class="feature-card">
-      <span class="feature-icon">🤖</span>
-      <div class="feature-title">Agent-Native</div>
-      <p class="feature-desc">
-        Built for AI agents first. CLI with <code>--json</code> on every command,
-        <code>llms.txt</code> endpoint, <code>CORRAL.md</code> auto-generated.
-        Your agent adds auth in 9 commands.
-      </p>
-    </div>
-
-    <div class="feature-card">
-      <span class="feature-icon">🔐</span>
-      <div class="feature-title">Better Auth Under the Hood</div>
-      <p class="feature-desc">
-        Sessions, OAuth, magic links, passkeys, 2FA — all from
-        <a href="https://www.better-auth.com" target="_blank" rel="noopener">Better Auth</a>.
-        Corral wraps it with billing and gating so you don't have to.
       </p>
     </div>
 
@@ -207,14 +326,119 @@
 
 <hr class="section-sep">
 
-<!-- ── How It Works ────────────────────────────────────────────── -->
+<!-- ── How Agents Use Corral ───────────────────────────────────── -->
+<section class="section">
+  <p class="section-label">Agent Workflow</p>
+  <h2 class="section-title">How agents use Corral</h2>
+  <p class="section-desc">
+    Six steps from "add auth" to shipping. No human touches auth code.
+  </p>
+
+  <div class="agent-workflow">
+    <div class="agent-workflow-step">
+      <div class="agent-workflow-num">1</div>
+      <div class="agent-workflow-text">
+        <strong>Agent reads <code>llms.txt</code></strong>
+        You paste <code>https://corralauth.dev/llms.txt</code> into your agent context,
+        or add it to <code>AGENTS.md</code> / <code>.cursorrules</code>. The agent now knows
+        every command, every endpoint, every option.
+      </div>
+    </div>
+    <div class="agent-workflow-step">
+      <div class="agent-workflow-num">2</div>
+      <div class="agent-workflow-text">
+        <strong>Agent runs <code>npm create corral</code></strong>
+        Scaffolds <code>corral.yaml</code>, route handlers, components, and <code>CORRAL.md</code>
+        into your project. Non-interactive. Idempotent.
+      </div>
+    </div>
+    <div class="agent-workflow-step">
+      <div class="agent-workflow-num">3</div>
+      <div class="agent-workflow-text">
+        <strong>Agent edits <code>corral.yaml</code> for your plans</strong>
+        Free tier, Pro at $29/mo, Enterprise — whatever you asked for. Auth providers,
+        feature flags, usage meters. All in one file.
+      </div>
+    </div>
+    <div class="agent-workflow-step">
+      <div class="agent-workflow-num">4</div>
+      <div class="agent-workflow-text">
+        <strong>Agent runs <code>corral add feature</code>, <code>corral add provider</code></strong>
+        Incremental commands for each capability. Idempotent — safe to re-run.
+        <code>--json</code> output on every command so the agent can branch on results.
+      </div>
+    </div>
+    <div class="agent-workflow-step">
+      <div class="agent-workflow-num">5</div>
+      <div class="agent-workflow-text">
+        <strong>Agent runs <code>corral validate</code> — all green</strong>
+        Checks config, env vars, database, Stripe sync. Exit 0 means deploy-ready.
+        If something's wrong, the JSON error tells the agent exactly how to fix it.
+      </div>
+    </div>
+    <div class="agent-workflow-step">
+      <div class="agent-workflow-num">6</div>
+      <div class="agent-workflow-text">
+        <strong>You have auth + payments. Ship it.</strong>
+        No human touched auth code. No auth docs were read. The agent handled everything.
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-sep">
+
+<!-- ── Works With Your Agent ───────────────────────────────────── -->
+<section class="section">
+  <p class="section-label">Compatibility</p>
+  <h2 class="section-title">Works with your agent</h2>
+  <p class="section-desc">
+    If it can run CLI commands and read markdown, it can use Corral.
+  </p>
+
+  <div class="agent-compat-grid">
+    <div class="agent-compat-card">
+      <div class="agent-compat-name">🦙 OpenClaw</div>
+      <div class="agent-compat-desc">First-class support. Corral ships as an OpenClaw skill. Point it at your project, say what you need.</div>
+    </div>
+    <div class="agent-compat-card">
+      <div class="agent-compat-name">🤖 Claude Code</div>
+      <div class="agent-compat-desc">Point it at <code>llms.txt</code>. It knows what to do. Add the URL to your AGENTS.md for persistent context.</div>
+    </div>
+    <div class="agent-compat-card">
+      <div class="agent-compat-name">⚡ Codex</div>
+      <div class="agent-compat-desc"><code>npm create corral</code> + <code>--json</code> flags = perfect for Codex. Structured output, no screen-scraping.</div>
+    </div>
+    <div class="agent-compat-card">
+      <div class="agent-compat-name">🎯 Cursor</div>
+      <div class="agent-compat-desc">Add <code>llms.txt</code> URL to your <code>.cursorrules</code>. Cursor handles the rest from inside your editor.</div>
+    </div>
+    <div class="agent-compat-card">
+      <div class="agent-compat-name">🌊 Windsurf</div>
+      <div class="agent-compat-desc">Add Corral's <code>llms.txt</code> to your project rules. Windsurf reads the spec and wires everything up.</div>
+    </div>
+    <div class="agent-compat-card">
+      <div class="agent-compat-name">🔧 Any Agent</div>
+      <div class="agent-compat-desc">If it can run CLI commands and read markdown, it can use Corral. The <code>--json</code> flag is on every command.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:32px;text-align:center">
+    <a href="agents.html" class="btn btn-primary">Full Agent Integration Guide →</a>
+  </div>
+</section>
+
+<hr class="section-sep">
+
+<!-- ── How It Works (YAML) ─────────────────────────────────────── -->
 <section class="how-section">
   <div class="section">
-    <p class="section-label">How It Works</p>
+    <p class="section-label">One Config File</p>
     <h2 class="section-title">YAML in → Full auth stack out</h2>
     <p class="section-desc">
       One file describes your entire auth + billing topology.
       Corral generates the routes, components, and database schema.
+      Your agent edits the YAML; Corral handles the wiring.
     </p>
 
     <div class="how-grid">
@@ -222,31 +446,27 @@
       <div class="how-box">
         <div class="how-box-title">📄 corral.yaml</div>
         <pre style="font-family:var(--font-mono);font-size:0.78rem;line-height:1.7;color:#c9d1d9;overflow-x:auto"><code><span style="color:#93c5fd">app</span>:
-  <span style="color:#93c5fd">name</span>: <span style="color:#86efac">HORIZON</span>
-  <span style="color:#93c5fd">url</span>: <span style="color:#86efac">https://horizon.mil</span>
+  <span style="color:#93c5fd">name</span>: <span style="color:#86efac">MySaaSApp</span>
+  <span style="color:#93c5fd">url</span>: <span style="color:#86efac">https://myapp.com</span>
 
 <span style="color:#93c5fd">auth</span>:
   <span style="color:#93c5fd">providers</span>:
     - <span style="color:#86efac">google</span>
     - <span style="color:#86efac">email</span>
-    - <span style="color:#86efac">device</span>
 
 <span style="color:#93c5fd">plans</span>:
   <span style="color:#c084fc">free</span>:
     <span style="color:#93c5fd">price</span>: <span style="color:#fb923c">0</span>
-    <span style="color:#93c5fd">features</span>: [<span style="color:#86efac">basic_search</span>, <span style="color:#86efac">export_csv</span>]
+    <span style="color:#93c5fd">features</span>: [<span style="color:#86efac">basic_access</span>]
   <span style="color:#c084fc">pro</span>:
-    <span style="color:#93c5fd">price</span>: <span style="color:#fb923c">49</span>
-    <span style="color:#93c5fd">features</span>: [<span style="color:#86efac">*</span>, <span style="color:#86efac">ai_analysis</span>, <span style="color:#86efac">real_time</span>]
-    <span style="color:#93c5fd">meters</span>:
-      <span style="color:#93c5fd">api_calls</span>: <span style="color:#fb923c">10000</span>/month
+    <span style="color:#93c5fd">price</span>: <span style="color:#fb923c">29</span>
+    <span style="color:#93c5fd">features</span>: [<span style="color:#86efac">*</span>, <span style="color:#86efac">ai_features</span>]
+    <span style="color:#93c5fd">trial_days</span>: <span style="color:#fb923c">14</span>
 
 <span style="color:#93c5fd">features</span>:
-  <span style="color:#c084fc">ai_analysis</span>:
-    <span style="color:#93c5fd">plans</span>: [<span style="color:#86efac">pro</span>, <span style="color:#86efac">enterprise</span>]
-    <span style="color:#93c5fd">gate</span>: <span style="color:#86efac">blur</span>
-  <span style="color:#c084fc">export_csv</span>:
-    <span style="color:#93c5fd">plans</span>: [<span style="color:#86efac">free</span>, <span style="color:#86efac">pro</span>]</code></pre>
+  <span style="color:#c084fc">ai_features</span>:
+    <span style="color:#93c5fd">plans</span>: [<span style="color:#86efac">pro</span>]
+    <span style="color:#93c5fd">gate</span>: <span style="color:#86efac">blur</span></code></pre>
       </div>
 
       <!-- Arrow -->
@@ -286,13 +506,99 @@
           </div>
           <div style="display:flex;align-items:center;gap:10px;color:var(--text-muted)">
             <span style="color:var(--green)">✓</span>
-            Device auth for CLI tools
+            <code>GET /llms.txt</code> for agents
           </div>
           <div style="display:flex;align-items:center;gap:10px;color:var(--text-muted)">
             <span style="color:var(--green)">✓</span>
-            <code>GET /llms.txt</code> for agents
+            <code>CORRAL.md</code> project guide
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-sep">
+
+<!-- ── Agent-Native Features ───────────────────────────────────── -->
+<section class="section">
+  <p class="section-label">Agent-Native Design</p>
+  <h2 class="section-title">Every detail built for agents</h2>
+  <p class="section-desc">
+    An agent can add full auth + billing to any app in 9 commands.
+    No screen-scraping. No ambiguity. Just structured I/O.
+  </p>
+
+  <div class="agents-grid">
+    <div class="agent-card">
+      <div class="agent-card-title">
+        <span>📋</span>
+        <code>/api/llms.txt</code>
+      </div>
+      <p class="agent-card-desc">
+        Auto-generated endpoint on every Corral app. Describes the project's
+        auth config, active plans, feature gates, and API surface in a format
+        LLMs parse cleanly. Follows the <a href="https://llmstxt.org" target="_blank" rel="noopener">llms.txt spec</a>.
+        Also served at <a href="llms.txt">corralauth.dev/llms.txt</a>.
+      </p>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-title">
+        <span>📖</span>
+        <code>CORRAL.md</code>
+      </div>
+      <p class="agent-card-desc">
+        Generated at init time and updated on every <code>corral add</code>.
+        A project-specific guide: what's configured, what routes exist,
+        what gates are active, how to test auth locally. Designed for agent system prompts.
+      </p>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-title">
+        <span>⚡</span>
+        <code>corral add &lt;thing&gt;</code>
+      </div>
+      <p class="agent-card-desc">
+        Incremental commands that do one thing well.
+        <code>corral add feature ai_analysis --plans pro --gate blur</code>.
+        Idempotent. Safe to run twice. Agent-friendly JSON output.
+      </p>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-title">
+        <span>🔢</span>
+        <code>--json</code> everywhere
+      </div>
+      <p class="agent-card-desc">
+        Every CLI command accepts <code>--json</code> and exits with structured
+        output + a numeric exit code. Parse it, branch on it, pass it to the
+        next command. No screen-scraping.
+      </p>
+    </div>
+  </div>
+
+  <div style="margin-top:32px">
+    <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">The 9-command workflow — from zero to auth + billing:</p>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">agent workflow</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral analyze --json          <span style="color:#4d5566"># 1. understand the project</span></span>
+        <span class="terminal-line cmd">corral init --yes --json        <span style="color:#4d5566"># 2. scaffold everything</span></span>
+        <span class="terminal-line cmd">corral add provider google      <span style="color:#4d5566"># 3. add OAuth</span></span>
+        <span class="terminal-line cmd">corral add plan pro --price 29  <span style="color:#4d5566"># 4. add paid plan</span></span>
+        <span class="terminal-line cmd">corral add feature ai_features --plans pro  <span style="color:#4d5566"># 5. gate a feature</span></span>
+        <span class="terminal-line cmd">corral add meter api_calls --limit 10000    <span style="color:#4d5566"># 6. add usage meter</span></span>
+        <span class="terminal-line cmd">corral stripe push --json       <span style="color:#4d5566"># 7. sync to Stripe</span></span>
+        <span class="terminal-line cmd">corral validate --json          <span style="color:#4d5566"># 8. verify everything</span></span>
+        <span class="terminal-line cmd">corral seed --env test --json   <span style="color:#4d5566"># 9. seed test users</span></span>
       </div>
     </div>
   </div>
@@ -362,92 +668,6 @@
 
 <hr class="section-sep">
 
-<!-- ── For Agents ──────────────────────────────────────────────── -->
-<section class="section">
-  <p class="section-label">Agent-Native</p>
-  <h2 class="section-title">For agents, by agents</h2>
-  <p class="section-desc">
-    Every command outputs <code>--json</code>. Every project gets a
-    <code>CORRAL.md</code> and an <code>/api/llms.txt</code> endpoint.
-    An agent can add full auth + billing to any app in 9 commands.
-  </p>
-
-  <div class="agents-grid">
-    <div class="agent-card">
-      <div class="agent-card-title">
-        <span>📋</span>
-        <code>/api/llms.txt</code>
-      </div>
-      <p class="agent-card-desc">
-        Auto-generated endpoint on every Corral app. Describes the project's
-        auth config, active plans, feature gates, and API surface in a format
-        LLMs parse cleanly. Follows the <a href="https://llmstxt.org" target="_blank" rel="noopener">llms.txt spec</a>.
-      </p>
-    </div>
-
-    <div class="agent-card">
-      <div class="agent-card-title">
-        <span>📖</span>
-        <code>CORRAL.md</code>
-      </div>
-      <p class="agent-card-desc">
-        Generated at init time and updated on every <code>corral add</code>.
-        A project-specific guide: what's configured, what routes exist,
-        what gates are active, how to test auth locally.
-      </p>
-    </div>
-
-    <div class="agent-card">
-      <div class="agent-card-title">
-        <span>⚡</span>
-        <code>corral add &lt;thing&gt;</code>
-      </div>
-      <p class="agent-card-desc">
-        Incremental commands that do one thing well.
-        <code>corral add feature ai_analysis --plans pro,enterprise --gate blur</code>.
-        Idempotent. Safe to run twice. Agent-friendly output.
-      </p>
-    </div>
-
-    <div class="agent-card">
-      <div class="agent-card-title">
-        <span>🔢</span>
-        <code>--json</code> everywhere
-      </div>
-      <p class="agent-card-desc">
-        Every CLI command accepts <code>--json</code> and exits with structured
-        output + a numeric exit code. Parse it, branch on it, pass it to the
-        next command. No screen-scraping.
-      </p>
-    </div>
-  </div>
-
-  <div style="margin-top:32px">
-    <p style="font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">The 9-command workflow an agent uses to add auth to HORIZON:</p>
-    <div class="terminal">
-      <div class="terminal-bar">
-        <div class="terminal-dot red"></div>
-        <div class="terminal-dot yellow"></div>
-        <div class="terminal-dot green"></div>
-        <span class="terminal-title">agent workflow</span>
-      </div>
-      <div class="terminal-body">
-        <span class="terminal-line cmd">corral analyze --json          <span style="color:#4d5566"># 1. understand the project</span></span>
-        <span class="terminal-line cmd">corral init --yes --json        <span style="color:#4d5566"># 2. scaffold everything</span></span>
-        <span class="terminal-line cmd">corral add provider google      <span style="color:#4d5566"># 3. add OAuth</span></span>
-        <span class="terminal-line cmd">corral add plan pro --price 49  <span style="color:#4d5566"># 4. add paid plan</span></span>
-        <span class="terminal-line cmd">corral add feature ai_analysis --plans pro  <span style="color:#4d5566"># 5. gate a feature</span></span>
-        <span class="terminal-line cmd">corral add meter api_calls --limit 10000    <span style="color:#4d5566"># 6. add usage meter</span></span>
-        <span class="terminal-line cmd">corral stripe push --json       <span style="color:#4d5566"># 7. sync to Stripe</span></span>
-        <span class="terminal-line cmd">corral validate --json          <span style="color:#4d5566"># 8. verify everything</span></span>
-        <span class="terminal-line cmd">corral seed --env test --json   <span style="color:#4d5566"># 9. seed test users</span></span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<hr class="section-sep">
-
 <!-- ── Footer ──────────────────────────────────────────────────── -->
 <footer style="padding:0 24px">
   <div class="site-footer">
@@ -459,8 +679,9 @@
     <div class="footer-right">
       <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a>
       <a href="quickstart.html">Docs</a>
+      <a href="agents.html">For Agents</a>
       <a href="llms.txt">llms.txt</a>
-      <span>Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <span>Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a> · Made for agents, works for humans too</span>
     </div>
   </div>
 </footer>

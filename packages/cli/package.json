@@ -1,7 +1,7 @@
 {
   "name": "create-corral",
   "version": "0.1.0",
-  "description": "CLI tool for scaffolding Corral-powered SaaS apps",
+  "description": "Agent-native auth + payments. Your AI coding agent adds login, Stripe billing, and feature gating to any app.",
   "type": "module",
   "license": "MIT",
   "bin": {
