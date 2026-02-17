@@ -1,0 +1,31 @@
+// {{APP_NAME}} — Corral Auth Server (Hono)
+// Lightweight, edge-ready auth server. Works with Bun, Deno, Node, Cloudflare Workers.
+// Run with: npx tsx server/auth.ts (Node) or bun server/auth.ts (Bun)
+
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { serve } from "@hono/node-server";
+import { auth } from "./corral.js";
+
+const app = new Hono();
+const port = parseInt(process.env.CORRAL_PORT || "{{PORT}}");
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// LEARNING #4/#5: CORS with credentials + both localhost variants
+app.use("/api/auth/*", cors({
+  origin: [corsOrigin, corsOrigin.replace("localhost", "127.0.0.1")],
+  credentials: true,
+}));
+
+// Mount Better Auth — Hono passes raw Request directly
+app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
+// Health check
+app.get("/health", (c) => c.json({ ok: true }));
+
+// LEARNING #7: Bind to 0.0.0.0
+serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
+  console.log(`🤠 Corral auth server (Hono) running on http://localhost:${port}`);
+  console.log(`   Auth endpoints: http://localhost:${port}/api/auth/*`);
+  console.log(`   CORS origin: ${corsOrigin}`);
+});

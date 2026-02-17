@@ -1,0 +1,137 @@
+# Corral Configuration — {{APP_NAME}}
+# Docs: https://github.com/llama-farm/corral
+
+app:
+  name: "{{APP_NAME}}"
+  id: "{{APP_ID}}"
+  domain: "http://localhost:3000"
+  # logo: "/logo.svg"
+  # support_email: "support@example.com"
+
+database:
+  adapter: sqlite          # sqlite | pg | mysql
+  url: "file:./corral.db"  # For pg: postgresql://localhost:5432/{{APP_ID}}
+  auto_migrate: true
+
+# ── Authentication ─────────────────────────────────────────────────────
+auth:
+  # server_url: "http://localhost:3000"  # Auto-detected from BETTER_AUTH_URL env
+  # secret: from BETTER_AUTH_SECRET env  # Generate: openssl rand -base64 32
+
+  methods:
+    email_password: true      # Traditional email + password login
+
+    # Passwordless (requires email transport below)
+    # magic_link: true         # Email a sign-in link
+    # email_otp: true          # Email a 6-digit code
+
+    # Social providers — set to `true` to read keys from env vars,
+    # or provide explicit config. All keys go in .env.local:
+    #
+    #   GOOGLE_CLIENT_ID=...
+    #   GOOGLE_CLIENT_SECRET=...
+    #   GITHUB_CLIENT_ID=...
+    #   GITHUB_CLIENT_SECRET=...
+    #
+    # google: true
+    # github: true
+    # apple: true
+    # discord: true
+    # microsoft: true
+
+  # Email transport — needed for magic links, OTP, password reset, verification
+  # email:
+  #   transport: console       # console (dev) | smtp | resend | postmark
+  #   from: "noreply@example.com"
+  #   verify_on_signup: false
+  #   smtp:                    # For transport: smtp
+  #     host: "${SMTP_HOST}"   # Read from env
+  #     port: 587
+  #     user: "${SMTP_USER}"
+  #     pass: "${SMTP_PASS}"
+  #   resend:                  # For transport: resend
+  #     apiKey: "${RESEND_API_KEY}"
+
+  session:
+    max_age: 2592000           # 30 days (seconds)
+    update_age: 86400          # 1 day
+
+  # trusted_origins:           # For SPA/cross-origin
+  #   - "http://localhost:5173"
+
+# ── Plans & Features ──────────────────────────────────────────────────
+plans:
+  - name: Free
+    display_name: "Free"
+    price: 0
+    features: ["Basic access"]
+    cta: "Get Started"
+
+  - name: Pro
+    display_name: "Pro"
+    price: 29
+    interval: month
+    stripe_price_id: ""        # Set after: corral stripe sync
+    trial: true
+    popular: true
+    features:
+      - "Everything in Free"
+      - "Priority support"
+    cta: "Start Free Trial"
+
+# Feature gating — maps feature IDs to allowed plan names
+# Special values: "*" (anyone incl. anonymous), "authenticated" (any logged-in user)
+features:
+  browse: ["*"]                # Anyone can browse
+  save: ["authenticated"]      # Must be logged in
+  export: ["Free", "Pro"]      # Free tier and up
+  # advanced: ["Pro"]          # Pro only
+
+# ── Billing ────────────────────────────────────────────────────────────
+billing:
+  provider: stripe             # stripe | none
+  stripe:
+    # Keys from .env.local:
+    # STRIPE_SECRET_KEY=sk_test_...
+    # NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_test_...
+    # STRIPE_WEBHOOK_SECRET=whsec_...
+    require_payment_method: true
+  currency: usd
+  trial_days: 14
+  cancel_behavior: end_of_period
+
+# ── Usage Meters ────────────────────────────────────────────────────────
+meters:
+  api_calls:
+    label: "API Calls"
+    unit: requests
+    type: cap
+    reset_period: month
+    limits:
+      Free: 100
+      Pro: 10000
+    warning_at: 0.8
+    nudge:
+      message: "You've used {{percent}}% of your API calls"
+      cta: "Upgrade"
+
+# ── Seed Data ──────────────────────────────────────────────────────────
+seed:
+  admin:
+    email: "admin@example.com"
+    password: "admin123"
+    name: "Admin"
+  test_users:
+    - email: "user@example.com"
+      password: "test123"
+      name: "Test User"
+      plan: Free
+    - email: "pro@example.com"
+      password: "test123"
+      name: "Pro User"
+      plan: Pro
+
+# ── Admin Dashboard ────────────────────────────────────────────────────
+admin:
+  path: /admin
+  require_role: admin

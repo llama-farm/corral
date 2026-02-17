@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stripe Billing — Corral Docs</title>
+  <meta name="description" content="Configure Stripe billing plans, handle webhooks, and build checkout flows with Corral.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html" class="active">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">On This Page</div>
+      <ul class="sidebar-nav">
+        <li><a href="#plan-config">Plan Config</a></li>
+        <li><a href="#stripe-push">stripe push</a></li>
+        <li><a href="#checkout-web">Checkout (Web)</a></li>
+        <li><a href="#checkout-cli">Checkout (CLI/Device)</a></li>
+        <li><a href="#webhooks">Webhooks</a></li>
+        <li><a href="#billing-portal">Billing Portal</a></li>
+        <li><a href="#test-mode">Test Mode</a></li>
+        <li><a href="#annual-plans">Annual Plans</a></li>
+        <li><a href="#metered-billing">Metered Billing</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="cli.html">CLI Reference</a></li>
+        <li><a href="api.html">API Reference</a></li>
+        <li><a href="gating.html">Feature Gating</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>Stripe Billing</h1>
+    <p class="docs-lead">
+      Corral wires your <code>corral.yaml</code> plans directly to Stripe.
+      One command syncs products, prices, and webhooks. You get checkout sessions,
+      billing portal, and subscription lifecycle — all handled.
+    </p>
+
+    <div class="callout info">
+      <div class="callout-title">Stripe not required</div>
+      Billing is optional. If you only need free-plan gating or role-based access,
+      skip Stripe entirely. Add it later with <code>corral add plan pro --price 49</code>
+      followed by <code>corral stripe push</code>.
+    </div>
+
+    <!-- ── Plan Config ─────────────────────────────── -->
+    <h2 id="plan-config">Plan Configuration</h2>
+    <p>
+      Define your plans in <code>corral.yaml</code>. Every field maps directly
+      to a Stripe Product + Price object when you run <code>corral stripe push</code>.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">plans</span>:
+  <span class="tok-comment"># Free plan — no Stripe product created</span>
+  <span class="tok-key">free</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">0</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Basic access. No credit card required.</span>
+    <span class="tok-key">features</span>: [<span class="tok-string">basic_search</span>, <span class="tok-string">export_csv</span>]
+
+  <span class="tok-comment"># Paid monthly plan</span>
+  <span class="tok-key">pro</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">49</span>
+    <span class="tok-key">interval</span>: <span class="tok-string">month</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Full analysis suite for HORIZON analysts.</span>
+    <span class="tok-key">trial_days</span>: <span class="tok-number">14</span>
+    <span class="tok-key">stripe_metadata</span>:
+      <span class="tok-key">tier</span>: <span class="tok-string">pro</span>
+      <span class="tok-key">seat_type</span>: <span class="tok-string">analyst</span>
+
+  <span class="tok-comment"># Annual plan (same features as pro, discounted)</span>
+  <span class="tok-key">pro_annual</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">490</span>
+    <span class="tok-key">interval</span>: <span class="tok-string">year</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Pro plan, billed annually (2 months free).</span>
+    <span class="tok-key">inherits</span>: <span class="tok-string">pro</span>   <span class="tok-comment"># shares all pro features</span>
+
+  <span class="tok-comment"># Custom enterprise — no Stripe price (manual invoicing)</span>
+  <span class="tok-key">enterprise</span>:
+    <span class="tok-key">price</span>: <span class="tok-keyword">custom</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Air-gapped deployment, custom SLA, SSO.</span>
+    <span class="tok-key">contact</span>: <span class="tok-string">enterprise@horizon.mil</span></code></pre>
+    </div>
+
+    <!-- ── stripe push ─────────────────────────── -->
+    <h2 id="stripe-push">corral stripe push</h2>
+    <p>
+      Syncs your YAML plans to Stripe. Creates Products and Prices for any plan with a numeric price.
+      If products already exist (matched by metadata), updates them. Idempotent.
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral stripe push</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line info">Using STRIPE_SECRET_KEY (test mode: sk_test_...)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Created  Product: HORIZON Pro          → prod_R2xK9mN2aLp</span>
+        <span class="terminal-line success">Created  Price:   $49/month             → price_1Ov9mR2xK9mN</span>
+        <span class="terminal-line success">Created  Product: HORIZON Pro Annual    → prod_R2xK9mN3bMq</span>
+        <span class="terminal-line success">Created  Price:   $490/year             → price_1Ov9mR2xK9mQ</span>
+        <span class="terminal-line info">Skipped  Plan:    free (no Stripe product needed)</span>
+        <span class="terminal-line info">Skipped  Plan:    enterprise (custom pricing)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Registered webhook: https://horizon.mil/api/billing/webhook</span>
+        <span class="terminal-line success">  Events: customer.subscription.*, invoice.*, checkout.session.*</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line info">Writing price IDs to .env.local:</span>
+        <span class="terminal-line output">  STRIPE_PRICE_PRO=price_1Ov9mR2xK9mN</span>
+        <span class="terminal-line output">  STRIPE_PRICE_PRO_ANNUAL=price_1Ov9mR2xK9mQ</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Done. Run corral validate to confirm sync.</span>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-title">Production push</div>
+      Use <code>corral stripe push --env production</code> to push to live mode.
+      Always run <code>--dry-run</code> first to preview changes:
+      <code>corral stripe push --dry-run --env production</code>.
+    </div>
+
+    <!-- ── Checkout Web ─────────────────────────── -->
+    <h2 id="checkout-web">Checkout Flow — Web</h2>
+    <p>
+      Trigger a Stripe Checkout session from your frontend.
+      Corral's billing endpoint handles session creation and redirect.
+    </p>
+
+    <h3>Option A — Link to checkout URL</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">Upgrade button</span><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-comment">{/* Simplest: link directly to Corral's checkout endpoint */}</span>
+&lt;a href=<span class="tok-string">"/api/billing/checkout?plan=pro&amp;return_url=/dashboard"</span>&gt;
+  Upgrade to Pro
+&lt;/a&gt;</code></pre>
+    </div>
+
+    <h3>Option B — Server action (Next.js)</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">src/app/upgrade/actions.ts</span><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-string">'use server'</span>
+<span class="tok-keyword">import</span> { corral } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+<span class="tok-keyword">import</span> { redirect } <span class="tok-keyword">from</span> <span class="tok-string">'next/navigation'</span>
+
+<span class="tok-keyword">export async function</span> <span class="tok-cmd">startCheckout</span>(plan: <span class="tok-string">'pro'</span> | <span class="tok-string">'pro_annual'</span>) {
+  <span class="tok-keyword">const</span> session = <span class="tok-keyword">await</span> <span class="tok-cmd">getSession</span>()
+  <span class="tok-keyword">if</span> (!session) <span class="tok-cmd">redirect</span>(<span class="tok-string">'/login'</span>)
+
+  <span class="tok-keyword">const</span> { url } = <span class="tok-keyword">await</span> corral.billing.<span class="tok-cmd">createCheckoutSession</span>({
+    userId: session.user.id,
+    plan,
+    successUrl: <span class="tok-string">`${process.env.NEXT_PUBLIC_URL}/dashboard?upgraded=1`</span>,
+    cancelUrl: <span class="tok-string">`${process.env.NEXT_PUBLIC_URL}/pricing`</span>,
+  })
+
+  <span class="tok-cmd">redirect</span>(url)
+}</code></pre>
+    </div>
+
+    <h3>The checkout sequence</h3>
+    <ol>
+      <li>User clicks "Upgrade to Pro"</li>
+      <li>Your server calls <code>corral.billing.createCheckoutSession()</code> (or hits <code>POST /api/billing/checkout</code>)</li>
+      <li>Corral creates a Stripe Checkout Session and returns its URL</li>
+      <li>User is redirected to <code>checkout.stripe.com</code></li>
+      <li>User completes payment</li>
+      <li>Stripe fires <code>checkout.session.completed</code> webhook</li>
+      <li>Corral's webhook handler updates the user's plan in your database</li>
+      <li>User is redirected to your <code>successUrl</code></li>
+      <li>On next request, their session reflects the new plan</li>
+    </ol>
+
+    <!-- ── Checkout CLI ─────────────────────────── -->
+    <h2 id="checkout-cli">Checkout Flow — CLI / Device Auth</h2>
+    <p>
+      When a CLI tool needs to upgrade the user's plan, it can't open a browser
+      directly. Corral supports a CLI-friendly checkout flow using device auth.
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+        <span class="terminal-title">horizon-cli upgrade</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">horizon upgrade --plan pro</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">To upgrade to HORIZON Pro ($49/month):</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  Open: https://horizon.mil/upgrade?token=tok_Xk9m2N</span>
+        <span class="terminal-line output">  Code: XKCD-9821</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">Waiting for payment confirmation...</span>
+        <span class="terminal-line success">Payment confirmed! You're now on HORIZON Pro.</span>
+        <span class="terminal-line success">API call limit: 10,000/month</span>
+      </div>
+    </div>
+
+    <!-- ── Webhooks ─────────────────────────────── -->
+    <h2 id="webhooks">Webhooks</h2>
+    <p>
+      Corral auto-registers and handles Stripe webhooks at
+      <code>/api/billing/webhook</code>. The core lifecycle events are
+      handled automatically — you hook in for custom logic.
+    </p>
+
+    <h3>Built-in webhook handling</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Stripe Event</th><th>Corral Action</th></tr></thead>
+        <tbody>
+          <tr><td><code>checkout.session.completed</code></td><td>Activate subscription, update user plan, send welcome email</td></tr>
+          <tr><td><code>customer.subscription.updated</code></td><td>Update plan in DB, handle upgrades/downgrades</td></tr>
+          <tr><td><code>customer.subscription.deleted</code></td><td>Downgrade to free plan, send cancellation email</td></tr>
+          <tr><td><code>invoice.payment_succeeded</code></td><td>Reset usage meters for new billing period</td></tr>
+          <tr><td><code>invoice.payment_failed</code></td><td>Mark subscription as <code>past_due</code>, send payment failure email</td></tr>
+          <tr><td><code>customer.subscription.trial_will_end</code></td><td>Send 3-day trial ending email</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Custom webhook handlers</h3>
+    <p>Add your own logic for any Stripe event in <code>corral.yaml</code>:</p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">webhooks</span>:
+  <span class="tok-key">invoice.payment_failed</span>:
+    <span class="tok-key">handler</span>: <span class="tok-string">src/handlers/payment-failed.ts</span>
+  <span class="tok-key">customer.subscription.updated</span>:
+    <span class="tok-key">handler</span>: <span class="tok-string">src/handlers/subscription-updated.ts</span></code></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">src/handlers/payment-failed.ts</span><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">import type</span> { WebhookHandler } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/core'</span>
+<span class="tok-keyword">import</span> { sendSlackAlert } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/slack'</span>
+
+<span class="tok-keyword">export const</span> handler: WebhookHandler&lt;<span class="tok-string">'invoice.payment_failed'</span>&gt; = <span class="tok-keyword">async</span> ({
+  event,
+  user,
+  subscription,
+}) => {
+  <span class="tok-comment">// event.data.object is the Stripe Invoice</span>
+  <span class="tok-keyword">const</span> invoice = event.data.object
+
+  <span class="tok-comment">// Send alert to ops team</span>
+  <span class="tok-keyword">await</span> <span class="tok-cmd">sendSlackAlert</span>({
+    channel: <span class="tok-string">'#billing-alerts'</span>,
+    text: <span class="tok-string">`Payment failed for ${user.email}: $${invoice.amount_due / 100}`</span>,
+  })
+}
+
+<span class="tok-keyword">export default</span> handler</code></pre>
+    </div>
+
+    <!-- ── Billing Portal ───────────────────────── -->
+    <h2 id="billing-portal">Billing Portal</h2>
+    <p>
+      Corral provides a pre-built billing portal link that takes users to Stripe's
+      hosted Customer Portal — where they can update payment methods, download invoices,
+      or cancel their subscription.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-comment">{/* Simple link — Corral creates the portal session server-side */}</span>
+&lt;a href=<span class="tok-string">"/api/billing/portal?return_url=/dashboard"</span>&gt;
+  Manage Billing
+&lt;/a&gt;
+
+<span class="tok-comment">{/* Or in a server action: */}</span>
+<span class="tok-keyword">const</span> { url } = <span class="tok-keyword">await</span> corral.billing.<span class="tok-cmd">createPortalSession</span>({
+  userId: session.user.id,
+  returnUrl: <span class="tok-string">'https://horizon.mil/dashboard'</span>,
+})
+<span class="tok-cmd">redirect</span>(url)</code></pre>
+    </div>
+
+    <h3>Customizing the portal</h3>
+    <p>
+      Configure the Stripe Customer Portal in your Stripe Dashboard under
+      <strong>Billing → Customer Portal</strong>. You can control which features
+      are available (cancellation, plan switching, payment method updates).
+    </p>
+
+    <div class="callout tip">
+      <div class="callout-title">Plan switching in the portal</div>
+      If you enable plan switching in the Stripe Customer Portal, Corral's webhook
+      handler automatically updates the user's plan when they switch. No extra code needed.
+    </div>
+
+    <!-- ── Test Mode ───────────────────────────── -->
+    <h2 id="test-mode">Testing with Stripe Test Mode</h2>
+    <p>
+      Corral automatically uses test mode when <code>STRIPE_SECRET_KEY</code>
+      starts with <code>sk_test_</code>. Use Stripe's test card numbers:
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Card Number</th><th>Behavior</th></tr></thead>
+        <tbody>
+          <tr><td><code>4242 4242 4242 4242</code></td><td>Successful payment</td></tr>
+          <tr><td><code>4000 0025 0000 3155</code></td><td>Requires 3D Secure authentication</td></tr>
+          <tr><td><code>4000 0000 0000 9995</code></td><td>Payment declined (insufficient funds)</td></tr>
+          <tr><td><code>4000 0000 0000 0069</code></td><td>Card expired</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Automated billing test</h3>
+    <p>
+      Run a full checkout + webhook cycle in CI without a browser:
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral stripe test --plan pro --email analyst@horizon-test.mil</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line info">Creating test customer...</span>
+        <span class="terminal-line info">Triggering checkout.session.completed webhook...</span>
+        <span class="terminal-line info">Waiting for webhook delivery...</span>
+        <span class="terminal-line success">User plan updated: free → pro</span>
+        <span class="terminal-line info">Triggering invoice.payment_succeeded...</span>
+        <span class="terminal-line success">Meters reset for new billing period</span>
+        <span class="terminal-line info">Triggering customer.subscription.deleted...</span>
+        <span class="terminal-line success">User plan updated: pro → free</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">All billing lifecycle events handled correctly ✓</span>
+      </div>
+    </div>
+
+    <!-- ── Annual Plans ─────────────────────────── -->
+    <h2 id="annual-plans">Annual Plans</h2>
+    <p>
+      Offer annual pricing alongside monthly. Corral handles the plan
+      mapping so that <code>pro</code> and <code>pro_annual</code> users
+      both get the same feature set.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">plans</span>:
+  <span class="tok-key">pro</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">49</span>
+    <span class="tok-key">interval</span>: <span class="tok-string">month</span>
+  <span class="tok-key">pro_annual</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">490</span>
+    <span class="tok-key">interval</span>: <span class="tok-string">year</span>
+    <span class="tok-key">inherits</span>: <span class="tok-string">pro</span>     <span class="tok-comment"># same features as pro</span>
+    <span class="tok-key">display_name</span>: <span class="tok-string">Pro (Annual)</span>
+
+<span class="tok-key">features</span>:
+  <span class="tok-key">ai_analysis</span>:
+    <span class="tok-comment"># Both pro and pro_annual get this feature</span>
+    <span class="tok-key">plans</span>: [<span class="tok-string">pro</span>, <span class="tok-string">pro_annual</span>, <span class="tok-string">enterprise</span>]</code></pre>
+    </div>
+
+    <!-- ── Metered Billing ──────────────────────── -->
+    <h2 id="metered-billing">Metered / Usage-Based Billing</h2>
+    <p>
+      For plans with overage charges, Corral integrates with Stripe's
+      metered billing. Set <code>overage: charge</code> on a meter and
+      Corral will report usage to Stripe at the end of each billing period.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">meters</span>:
+  <span class="tok-key">api_calls</span>:
+    <span class="tok-key">plans</span>:
+      <span class="tok-key">free</span>: <span class="tok-number">500</span>
+      <span class="tok-key">pro</span>: <span class="tok-number">10000</span>
+    <span class="tok-key">window</span>: <span class="tok-string">month</span>
+    <span class="tok-key">overage</span>: <span class="tok-string">charge</span>
+    <span class="tok-key">overage_price</span>: <span class="tok-number">0.001</span>    <span class="tok-comment"># $0.001 per API call over limit</span>
+    <span class="tok-key">stripe_meter_id</span>: <span class="tok-string">env:STRIPE_METER_API_CALLS</span></code></pre>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-title">Metered billing setup</div>
+      Metered billing requires creating a Stripe Meter in your dashboard and
+      adding a metered price to your product. Run <code>corral stripe push</code>
+      and Corral will prompt you through the setup, or do it manually in the
+      Stripe dashboard.
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="frameworks.html">← Framework Guides</a>
+        <a href="gating.html">Feature Gating →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

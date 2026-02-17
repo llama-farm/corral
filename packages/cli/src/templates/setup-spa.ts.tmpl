@@ -1,0 +1,115 @@
+// {{APP_NAME}} — Corral Auth Setup (Standalone Server for SPA)
+// This runs on your auth SERVER, not in the browser.
+// The React app connects via fetch to this server's /api/auth/* endpoints.
+
+import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
+import Database from "better-sqlite3";
+import path from "path";
+
+const dbPath = path.resolve(process.cwd(), "corral.db");
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// LEARNING #2: Auto-bootstrap tables on first run.
+// Better Auth CLI hangs — never depend on it. Raw SQL is reliable.
+function bootstrapDatabase(filePath: string) {
+  const db = new Database(filePath);
+  db.pragma("journal_mode = WAL");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      emailVerified INTEGER NOT NULL DEFAULT 0,
+      image TEXT,
+      plan TEXT NOT NULL DEFAULT 'free',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      role TEXT DEFAULT 'user',
+      banned INTEGER DEFAULT 0,
+      banReason TEXT,
+      banExpires TEXT
+    );
+    CREATE TABLE IF NOT EXISTS "session" (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expiresAt TEXT NOT NULL,
+      ipAddress TEXT,
+      userAgent TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS "account" (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      accountId TEXT NOT NULL,
+      providerId TEXT NOT NULL,
+      accessToken TEXT,
+      refreshToken TEXT,
+      accessTokenExpiresAt TEXT,
+      refreshTokenExpiresAt TEXT,
+      scope TEXT,
+      password TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS "verification" (
+      id TEXT PRIMARY KEY,
+      identifier TEXT NOT NULL,
+      value TEXT NOT NULL,
+      expiresAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS "subscription" (
+      id TEXT PRIMARY KEY,
+      plan TEXT NOT NULL DEFAULT 'free',
+      referenceId TEXT NOT NULL,
+      stripeCustomerId TEXT,
+      stripeSubscriptionId TEXT,
+      status TEXT,
+      periodStart TEXT,
+      periodEnd TEXT,
+      cancelAtPeriodEnd INTEGER DEFAULT 0,
+      seats INTEGER DEFAULT 1
+    );
+    CREATE INDEX IF NOT EXISTS idx_session_token ON "session"(token);
+    CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"(userId);
+    CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"(userId);
+    CREATE INDEX IF NOT EXISTS idx_user_email ON "user"(email);
+  `);
+
+  return db;
+}
+
+const db = bootstrapDatabase(dbPath);
+
+export const auth = betterAuth({
+  // LEARNING #1: Pass the raw Database instance directly.
+  // Do NOT use { db, type: "sqlite" } — causes "selectFrom is not a function".
+  database: db,
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:{{PORT}}",
+  basePath: "/api/auth",
+  secret: process.env.BETTER_AUTH_SECRET,
+  emailAndPassword: { enabled: true },
+  plugins: [admin()],
+  session: { expiresIn: 60 * 60 * 24 * 30 },
+  user: {
+    additionalFields: {
+      plan: {
+        type: "string" as const,
+        defaultValue: "free",
+      },
+    },
+  },
+  // LEARNING #5: trustedOrigins is required for sign-out and CSRF protection.
+  // Include both localhost and 127.0.0.1 variants — browsers may send either.
+  trustedOrigins: [
+    corsOrigin,
+    corsOrigin.replace("localhost", "127.0.0.1"),
+  ],
+});
+
+export type Session = typeof auth.$Infer.Session;

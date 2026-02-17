@@ -1,0 +1,126 @@
+// {{APP_NAME}} — Corral Auth Setup (MySQL)
+// Works with: PlanetScale, AWS RDS, DigitalOcean, any MySQL host
+// Set DATABASE_URL in your .env:
+//   PlanetScale: mysql://xxx:xxx@xxx.connect.psdb.cloud/mydb?ssl={"rejectUnauthorized":true}
+//   Local:       mysql://root:password@localhost:3306/myapp
+
+import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
+import mysql from "mysql2/promise";
+
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL || "mysql://root:@localhost:3306/corral",
+  waitForConnections: true,
+  connectionLimit: 10,
+});
+
+// Auto-bootstrap tables on first connection
+async function bootstrapDatabase(pool: mysql.Pool) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`user\` (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        emailVerified BOOLEAN NOT NULL DEFAULT false,
+        image TEXT,
+        plan VARCHAR(50) NOT NULL DEFAULT 'free',
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        role VARCHAR(50) DEFAULT 'user',
+        banned BOOLEAN DEFAULT false,
+        banReason TEXT,
+        banExpires DATETIME
+      );
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`session\` (
+        id VARCHAR(36) PRIMARY KEY,
+        userId VARCHAR(36) NOT NULL,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        expiresAt DATETIME NOT NULL,
+        ipAddress VARCHAR(255),
+        userAgent TEXT,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
+      );
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`account\` (
+        id VARCHAR(36) PRIMARY KEY,
+        userId VARCHAR(36) NOT NULL,
+        accountId VARCHAR(255) NOT NULL,
+        providerId VARCHAR(255) NOT NULL,
+        accessToken TEXT,
+        refreshToken TEXT,
+        accessTokenExpiresAt DATETIME,
+        refreshTokenExpiresAt DATETIME,
+        scope TEXT,
+        password TEXT,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
+      );
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`verification\` (
+        id VARCHAR(36) PRIMARY KEY,
+        identifier VARCHAR(255) NOT NULL,
+        value TEXT NOT NULL,
+        expiresAt DATETIME NOT NULL,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      );
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`subscription\` (
+        id VARCHAR(36) PRIMARY KEY,
+        plan VARCHAR(50) NOT NULL DEFAULT 'free',
+        referenceId VARCHAR(255) NOT NULL,
+        stripeCustomerId VARCHAR(255),
+        stripeSubscriptionId VARCHAR(255),
+        status VARCHAR(50),
+        periodStart DATETIME,
+        periodEnd DATETIME,
+        cancelAtPeriodEnd BOOLEAN DEFAULT false,
+        seats INT DEFAULT 1
+      );
+    `);
+    console.log("📦 Database tables ready");
+  } finally {
+    conn.release();
+  }
+}
+
+bootstrapDatabase(pool).catch(err => {
+  console.error("Failed to bootstrap database:", err.message);
+});
+
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+export const auth = betterAuth({
+  // Better Auth auto-detects mysql2 pool via "getConnection" in pool
+  database: pool,
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:{{PORT}}",
+  basePath: "/api/auth",
+  secret: process.env.BETTER_AUTH_SECRET,
+  emailAndPassword: { enabled: true },
+  plugins: [admin()],
+  session: { expiresIn: 60 * 60 * 24 * 30 },
+  user: {
+    additionalFields: {
+      plan: {
+        type: "string" as const,
+        defaultValue: "free",
+      },
+    },
+  },
+  trustedOrigins: [
+    corsOrigin,
+    corsOrigin.replace("localhost", "127.0.0.1"),
+  ],
+});
+
+export type Session = typeof auth.$Infer.Session;

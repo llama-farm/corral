@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quickstart — Corral Docs</title>
+  <meta name="description" content="Add auth + billing + gating to your app in under 10 minutes.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html" class="active">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Getting Started</div>
+      <ul class="sidebar-nav">
+        <li><a href="quickstart.html" class="active">Quickstart</a></li>
+        <li><a href="concepts.html">Core Concepts</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="cli.html">CLI Reference</a></li>
+        <li><a href="api.html">API Reference</a></li>
+        <li><a href="frameworks.html">Framework Guides</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Features</div>
+      <ul class="sidebar-nav">
+        <li><a href="billing.html">Stripe Billing</a></li>
+        <li><a href="gating.html">Feature Gating</a></li>
+        <li><a href="agents.html">Agent Integration</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Resources</div>
+      <ul class="sidebar-nav">
+        <li><a href="llms.txt">llms.txt</a></li>
+        <li><a href="llms-full.txt">llms-full.txt</a></li>
+        <li><a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub ↗</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="docs-content">
+    <h1>Quickstart</h1>
+    <p class="docs-lead">
+      Add auth + billing + feature gating to your app in under 10 minutes.
+      We'll use HORIZON (a Next.js military intel dashboard) as the example throughout.
+    </p>
+
+    <div class="callout info">
+      <div class="callout-title">Prerequisites</div>
+      Node.js 18+, an existing app (Next.js, Express, Hono, etc.), and optionally
+      a Stripe account (test mode works). You don't need Stripe to start —
+      free-plan gating works without it.
+    </div>
+
+    <!-- ── Step 1 ───────────────────────────────────────── -->
+    <h2>Step 1 — Initialize Corral</h2>
+    <p>
+      Run <code>npx corral init</code> in your project root. The CLI analyzes your
+      project structure, detects your framework and database, and scaffolds everything.
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">~/projects/horizon</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">npx corral init</span>
+        <span class="terminal-line info">Analyzing project structure…</span>
+        <span class="terminal-line info">Detected: Next.js 14.2, TypeScript, PostgreSQL (Prisma)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">? App name: <span style="color:#c9d1d9">HORIZON</span></span>
+        <span class="terminal-line output">? Auth providers: <span style="color:#c9d1d9">Google, Email magic link</span></span>
+        <span class="terminal-line output">? Add billing (Stripe)? <span style="color:#c9d1d9">Yes</span></span>
+        <span class="terminal-line output">? Plans: <span style="color:#c9d1d9">free, pro ($49/mo), enterprise (custom)</span></span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Created  corral.yaml</span>
+        <span class="terminal-line success">Created  src/app/api/auth/[...corral]/route.ts</span>
+        <span class="terminal-line success">Created  src/app/api/billing/[...corral]/route.ts</span>
+        <span class="terminal-line success">Created  src/lib/corral.ts</span>
+        <span class="terminal-line success">Created  src/components/corral/FeatureGate.tsx</span>
+        <span class="terminal-line success">Created  src/components/corral/PlanGate.tsx</span>
+        <span class="terminal-line success">Created  src/components/corral/AuthGate.tsx</span>
+        <span class="terminal-line success">Created  src/components/corral/PageGate.tsx</span>
+        <span class="terminal-line success">Created  src/app/admin/page.tsx</span>
+        <span class="terminal-line success">Created  CORRAL.md</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line info">Added to .env.local: CORRAL_SECRET, STRIPE_SECRET_KEY (placeholder)</span>
+        <span class="terminal-line info">Run: npm install @corral/core @corral/next</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Done in 1.2s. Next: edit corral.yaml, then npm run dev.</span>
+      </div>
+    </div>
+
+    <p>Install the generated dependencies:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>npm install @corral/core @corral/next</code></pre>
+    </div>
+
+    <!-- ── Step 2 ───────────────────────────────────────── -->
+    <h2>Step 2 — Edit corral.yaml</h2>
+    <p>
+      The generated <code>corral.yaml</code> is a starting point. Customize it for
+      HORIZON's needs — add providers, define plans, gate features:
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">corral.yaml</span>
+        <span class="code-lang">yaml</span>
+      </div>
+      <pre><code><span class="tok-key">app</span>:
+  <span class="tok-key">name</span>: <span class="tok-string">HORIZON</span>
+  <span class="tok-key">url</span>: <span class="tok-string">https://horizon.mil</span>
+  <span class="tok-key">description</span>: <span class="tok-string">Military intelligence dashboard</span>
+
+<span class="tok-comment"># Auth providers — each one generates login UI + session handling</span>
+<span class="tok-key">auth</span>:
+  <span class="tok-key">session_ttl</span>: <span class="tok-number">7d</span>
+  <span class="tok-key">providers</span>:
+    - <span class="tok-string">google</span>
+    - <span class="tok-key">email</span>:
+        <span class="tok-key">magic_link</span>: <span class="tok-keyword">true</span>
+        <span class="tok-key">otp</span>: <span class="tok-keyword">false</span>
+    - <span class="tok-string">device</span>  <span class="tok-comment"># CLI auth for HORIZON's own CLI</span>
+
+<span class="tok-comment"># Billing plans — synced to Stripe with `corral stripe push`</span>
+<span class="tok-key">plans</span>:
+  <span class="tok-key">free</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">0</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Basic access. No credit card required.</span>
+  <span class="tok-key">pro</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">49</span>
+    <span class="tok-key">interval</span>: <span class="tok-string">month</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Full analysis suite for analysts.</span>
+    <span class="tok-key">trial_days</span>: <span class="tok-number">14</span>
+  <span class="tok-key">enterprise</span>:
+    <span class="tok-key">price</span>: <span class="tok-keyword">custom</span>
+    <span class="tok-key">description</span>: <span class="tok-string">Air-gapped deployment + custom SLA.</span>
+
+<span class="tok-comment"># Features — map to plans, define gate behavior</span>
+<span class="tok-key">features</span>:
+  <span class="tok-key">basic_search</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">free</span>, <span class="tok-string">pro</span>, <span class="tok-string">enterprise</span>]
+  <span class="tok-key">export_csv</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">free</span>, <span class="tok-string">pro</span>, <span class="tok-string">enterprise</span>]
+  <span class="tok-key">ai_analysis</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">pro</span>, <span class="tok-string">enterprise</span>]
+    <span class="tok-key">gate</span>: <span class="tok-string">blur</span>        <span class="tok-comment"># show blurred preview to free users</span>
+  <span class="tok-key">real_time_feed</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">pro</span>, <span class="tok-string">enterprise</span>]
+    <span class="tok-key">gate</span>: <span class="tok-string">skeleton</span>    <span class="tok-comment"># show skeleton loader to free users</span>
+  <span class="tok-key">bulk_export</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">enterprise</span>]
+    <span class="tok-key">gate</span>: <span class="tok-string">block</span>       <span class="tok-comment"># hard block with upgrade CTA</span>
+  <span class="tok-key">admin_console</span>:
+    <span class="tok-key">roles</span>: [<span class="tok-string">admin</span>]      <span class="tok-comment"># role-based, not plan-based</span>
+
+<span class="tok-comment"># Usage meters — track consumption, enforce limits</span>
+<span class="tok-key">meters</span>:
+  <span class="tok-key">api_calls</span>:
+    <span class="tok-key">plans</span>:
+      <span class="tok-key">free</span>: <span class="tok-number">500</span>
+      <span class="tok-key">pro</span>: <span class="tok-number">10000</span>
+      <span class="tok-key">enterprise</span>: <span class="tok-keyword">unlimited</span>
+    <span class="tok-key">window</span>: <span class="tok-string">month</span>
+    <span class="tok-key">overage</span>: <span class="tok-string">block</span>      <span class="tok-comment"># or: charge, warn</span>
+  <span class="tok-key">export_rows</span>:
+    <span class="tok-key">plans</span>:
+      <span class="tok-key">free</span>: <span class="tok-number">1000</span>
+      <span class="tok-key">pro</span>: <span class="tok-number">100000</span>
+    <span class="tok-key">window</span>: <span class="tok-string">month</span>
+    <span class="tok-key">overage</span>: <span class="tok-string">warn</span>
+
+<span class="tok-comment"># Database — Corral shares your app's database</span>
+<span class="tok-key">database</span>:
+  <span class="tok-key">adapter</span>: <span class="tok-string">prisma</span>
+  <span class="tok-key">url</span>: <span class="tok-string">env:DATABASE_URL</span>
+
+<span class="tok-comment"># Admin page</span>
+<span class="tok-key">admin</span>:
+  <span class="tok-key">enabled</span>: <span class="tok-keyword">true</span>
+  <span class="tok-key">path</span>: <span class="tok-string">/admin</span>
+  <span class="tok-key">roles</span>: [<span class="tok-string">admin</span>]</code></pre>
+    </div>
+
+    <!-- ── Step 3 ───────────────────────────────────────── -->
+    <h2>Step 3 — Run your app</h2>
+    <p>
+      Corral mounts its routes during your app's startup. No separate process needed —
+      just run your app as normal:
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">~/projects/horizon</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">npm run dev</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  ▲ Next.js 14.2.0</span>
+        <span class="terminal-line output">  - Local: http://localhost:3000</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">🐴 Corral initialized (3 providers, 3 plans, 6 features)</span>
+        <span class="terminal-line info">  Auth:    http://localhost:3000/api/auth</span>
+        <span class="terminal-line info">  Billing: http://localhost:3000/api/billing</span>
+        <span class="terminal-line info">  Admin:   http://localhost:3000/admin</span>
+        <span class="terminal-line info">  llms.txt: http://localhost:3000/api/llms.txt</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  ✓ Ready in 892ms</span>
+      </div>
+    </div>
+
+    <p>
+      Visit <strong>http://localhost:3000/api/auth/signin</strong> to see your login page.
+      Corral has auto-generated UI for every configured provider.
+    </p>
+
+    <!-- ── Step 4 ───────────────────────────────────────── -->
+    <h2>Step 4 — Validate your config</h2>
+    <p>
+      <code>corral validate</code> checks your YAML against live state — providers,
+      plan definitions, feature gates, and database connectivity:
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">~/projects/horizon</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral validate</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  Config</span>
+        <span class="terminal-line success">  Syntax valid</span>
+        <span class="terminal-line success">  Schema valid (corral@0.1)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  Auth</span>
+        <span class="terminal-line success">  provider: google → GOOGLE_CLIENT_ID ✓  GOOGLE_CLIENT_SECRET ✓</span>
+        <span class="terminal-line success">  provider: email  → SMTP_URL ✓</span>
+        <span class="terminal-line success">  provider: device → no secrets needed</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  Plans</span>
+        <span class="terminal-line success">  free → $0/mo (3 features)</span>
+        <span class="terminal-line success">  pro  → $49/mo (6 features)</span>
+        <span class="terminal-line success">  enterprise → custom (6 features)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line output">  Database</span>
+        <span class="terminal-line success">  Connection: OK (pg 16.2)</span>
+        <span class="terminal-line success">  Migrations: up to date</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">  All checks passed ✓</span>
+      </div>
+    </div>
+
+    <!-- ── Step 5 ───────────────────────────────────────── -->
+    <h2>Step 5 — Sync to Stripe</h2>
+    <p>
+      If you added billing plans, push them to Stripe with one command.
+      This creates Products and Prices in Stripe and writes the price IDs back
+      into your YAML (or <code>.env</code> if you prefer):
+    </p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">~/projects/horizon</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral stripe push</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line info">Using STRIPE_SECRET_KEY (test mode)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Created product: HORIZON Pro  →  prod_QxK9mN2aLp</span>
+        <span class="terminal-line success">Created price:   $49/mo       →  price_1OvK9mN2aLp8xQJ</span>
+        <span class="terminal-line success">Created product: HORIZON Enterprise  →  prod_QxK9mN3bMq</span>
+        <span class="terminal-line info">Skipped:  free plan (no Stripe product needed)</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line info">Writing price IDs to .env.local…</span>
+        <span class="terminal-line success">Done. Run corral validate to confirm.</span>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-title">Test Mode</div>
+      Corral defaults to Stripe test mode when <code>NODE_ENV !== "production"</code>.
+      Use real Stripe test cards (4242 4242 4242 4242) to test the full checkout flow locally.
+    </div>
+
+    <!-- ── Step 6 ───────────────────────────────────────── -->
+    <h2>Step 6 — Gate your first feature</h2>
+    <p>
+      Now use Corral's components to gate the AI analysis panel in HORIZON.
+      The <code>ai_analysis</code> feature is configured with <code>gate: blur</code>,
+      so free-plan users see a blurred preview with an upgrade prompt:
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-filename">src/app/dashboard/page.tsx</span>
+        <span class="code-lang">tsx</span>
+      </div>
+      <pre><code><span class="tok-keyword">import</span> { FeatureGate } <span class="tok-keyword">from</span> <span class="tok-string">'@/components/corral/FeatureGate'</span>
+<span class="tok-keyword">import</span> { AIAnalysisPanel } <span class="tok-keyword">from</span> <span class="tok-string">'@/components/AIAnalysisPanel'</span>
+
+<span class="tok-keyword">export default function</span> <span class="tok-cmd">DashboardPage</span>() {
+  <span class="tok-keyword">return</span> (
+    &lt;div className=<span class="tok-string">"dashboard"</span>&gt;
+      &lt;h1&gt;Intelligence Overview&lt;/h1&gt;
+
+      <span class="tok-comment">{/* Free users see a blurred preview + upgrade CTA */}</span>
+      &lt;<span class="tok-cmd">FeatureGate</span> feature=<span class="tok-string">"ai_analysis"</span>&gt;
+        &lt;<span class="tok-cmd">AIAnalysisPanel</span> /&gt;
+      &lt;/FeatureGate&gt;
+
+      <span class="tok-comment">{/* This renders for everyone on free+ */}</span>
+      &lt;<span class="tok-cmd">FeatureGate</span> feature=<span class="tok-string">"basic_search"</span>&gt;
+        &lt;SearchPanel /&gt;
+      &lt;/FeatureGate&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+    </div>
+
+    <p>
+      That's it — <code>FeatureGate</code> reads the session server-side,
+      checks the plan, and applies the gate mode from your YAML.
+      No prop drilling, no context setup, no separate API call.
+    </p>
+
+    <!-- ── Step 7 ───────────────────────────────────────── -->
+    <h2>Step 7 — Deploy</h2>
+    <p>
+      Corral works with any deployment target that runs Node.js.
+      Set your environment variables and deploy as normal:
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Required</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>CORRAL_SECRET</code></td>
+            <td><span class="badge badge-red">Required</span></td>
+            <td>32+ char random string for session signing</td>
+          </tr>
+          <tr>
+            <td><code>DATABASE_URL</code></td>
+            <td><span class="badge badge-red">Required</span></td>
+            <td>Your database connection string</td>
+          </tr>
+          <tr>
+            <td><code>STRIPE_SECRET_KEY</code></td>
+            <td><span class="badge badge-gold">Billing</span></td>
+            <td>Stripe secret key (<code>sk_live_...</code>)</td>
+          </tr>
+          <tr>
+            <td><code>STRIPE_WEBHOOK_SECRET</code></td>
+            <td><span class="badge badge-gold">Billing</span></td>
+            <td>Stripe webhook signing secret</td>
+          </tr>
+          <tr>
+            <td><code>GOOGLE_CLIENT_ID</code></td>
+            <td><span class="badge badge-gray">OAuth</span></td>
+            <td>Google OAuth client ID</td>
+          </tr>
+          <tr>
+            <td><code>GOOGLE_CLIENT_SECRET</code></td>
+            <td><span class="badge badge-gray">OAuth</span></td>
+            <td>Google OAuth client secret</td>
+          </tr>
+          <tr>
+            <td><code>SMTP_URL</code></td>
+            <td><span class="badge badge-gray">Email</span></td>
+            <td>SMTP connection string for magic links</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">deploy to Railway</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">railway up</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line success">Deployed to https://horizon-production.up.railway.app</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">corral validate --env production</span>
+        <span class="terminal-line success">All checks passed ✓</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">corral stripe push --env production</span>
+        <span class="terminal-line info">Using STRIPE_SECRET_KEY (live mode)</span>
+        <span class="terminal-line success">Products synced. Webhooks registered.</span>
+      </div>
+    </div>
+
+    <h2>What's next?</h2>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px">
+      <a href="concepts.html" style="display:block;background:var(--bg-raised);border:1px solid var(--bg-border);border-radius:var(--radius-lg);padding:20px;text-decoration:none;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--bg-border)'">
+        <div style="font-weight:700;color:var(--text);margin-bottom:6px">Core Concepts →</div>
+        <div style="font-size:0.875rem;color:var(--text-muted)">Understand how auth, plans, and gating work under the hood.</div>
+      </a>
+      <a href="gating.html" style="display:block;background:var(--bg-raised);border:1px solid var(--bg-border);border-radius:var(--radius-lg);padding:20px;text-decoration:none;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--bg-border)'">
+        <div style="font-weight:700;color:var(--text);margin-bottom:6px">Feature Gating →</div>
+        <div style="font-size:0.875rem;color:var(--text-muted)">All 15 gating patterns with examples.</div>
+      </a>
+      <a href="billing.html" style="display:block;background:var(--bg-raised);border:1px solid var(--bg-border);border-radius:var(--radius-lg);padding:20px;text-decoration:none;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--bg-border)'">
+        <div style="font-weight:700;color:var(--text);margin-bottom:6px">Stripe Billing →</div>
+        <div style="font-size:0.875rem;color:var(--text-muted)">Checkout flows, webhooks, billing portal.</div>
+      </a>
+      <a href="agents.html" style="display:block;background:var(--bg-raised);border:1px solid var(--bg-border);border-radius:var(--radius-lg);padding:20px;text-decoration:none;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent-dim)'" onmouseout="this.style.borderColor='var(--bg-border)'">
+        <div style="font-weight:700;color:var(--text);margin-bottom:6px">Agent Integration →</div>
+        <div style="font-size:0.875rem;color:var(--text-muted)">llms.txt, CORRAL.md, the 9-command workflow.</div>
+      </a>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="index.html">← Home</a>
+        <a href="concepts.html">Core Concepts →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

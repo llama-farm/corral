@@ -1,0 +1,17 @@
+# GitHub Sponsors funding configuration
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# GitHub Sponsors username (replace with actual username)
+github: [llama-farm]
+
+# Open Collective (optional)
+# open_collective: corral
+
+# Patreon (optional)
+# patreon: llamafarm
+
+# Ko-fi (optional)
+# ko_fi: llamafarm
+
+# Custom sponsor URL (optional)
+# custom: https://llamafarm.dev/sponsor

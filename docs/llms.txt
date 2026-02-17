@@ -1,0 +1,263 @@
+# Corral
+
+> Auth + Billing + Gating in one YAML file.
+> Open-source SDK. Embedded in your app (not a hosted service). MIT license.
+> Built on Better Auth + Stripe. Agent-native by design.
+> GitHub: https://github.com/llama-farm/corral
+> Docs: https://corralauth.dev
+> Version: 0.1.0-alpha
+
+## What Corral Is
+
+Corral is a library that adds auth, billing, and feature gating to any Node.js app
+from a single YAML config file (`corral.yaml`). It mounts as route handlers inside
+your existing app — no Docker, no separate service, no per-MAU pricing.
+
+Key properties:
+- One config file (`corral.yaml`) defines everything
+- Shares your app's existing database
+- Mounts at `/api/auth` and `/api/billing` in your app
+- Every CLI command has --json output for agent use
+- Generates CORRAL.md (project-specific guide) and serves /api/llms.txt
+- Idempotent commands — safe to run twice
+
+## Quick Start (Agent Instructions)
+
+To add Corral to an existing app:
+
+1. `corral analyze --json`              — detect framework/database
+2. `corral init --yes --json`           — scaffold all files
+3. `corral add provider google --json`  — add OAuth provider
+4. `corral add plan pro --price 49 --json`  — add paid plan
+5. `corral add feature X --plans pro --gate blur --json`  — add feature gate
+6. `corral add meter api_calls --free 500 --pro 10000 --overage block --json`
+7. `corral stripe push --json`          — sync to Stripe
+8. `corral validate --strict --json`    — verify everything (exit 0 = OK)
+9. `corral seed --count 3 --json`       — create test users
+
+## corral.yaml Structure
+
+```yaml
+app:
+  name: MyApp
+  url: https://myapp.com
+
+auth:
+  session_ttl: 7d
+  providers:
+    - google
+    - email:
+        magic_link: true
+    - device   # for CLI tools
+
+plans:
+  free:
+    price: 0
+  pro:
+    price: 49
+    interval: month
+    trial_days: 14
+  enterprise:
+    price: custom
+
+features:
+  feature_name:
+    plans: [pro, enterprise]
+    gate: blur    # blur | skeleton | block | hide | disabled | redirect
+
+meters:
+  api_calls:
+    plans:
+      free: 500
+      pro: 10000
+      enterprise: unlimited
+    window: month
+    overage: block  # block | warn | charge
+
+database:
+  adapter: prisma   # prisma | drizzle | sqlite | postgres | mysql | turso
+  url: env:DATABASE_URL
+
+admin:
+  enabled: true
+  path: /admin
+  roles: [admin]
+```
+
+## CLI Commands
+
+All commands accept --json (structured output, exit 0=ok/1=error) and --help.
+
+### Setup
+- `corral analyze [path] [--json]`          — detect project, read-only
+- `corral init [--yes] [--json]`            — scaffold Corral into project
+- `corral doctor`                            — deep health check
+- `corral validate [--strict] [--json]`     — validate config vs live state
+- `corral status [--json]`                  — show runtime stats
+
+### Add capabilities (all idempotent)
+- `corral add page <path> [--gate F] [--plan P]`
+- `corral add feature <name> --plans <list> [--gate <mode>]`
+- `corral add meter <name> [--free N] [--pro N] [--overage block|warn|charge]`
+- `corral add provider <name> [--scopes <list>]`
+- `corral add plan <name> [--price N] [--interval month|year] [--trial N]`
+- `corral add webhook <event> [--handler <path>]`
+- `corral add device-verify [--page <path>]`
+- `corral add admin-page [--path <route>]`
+
+### Stripe
+- `corral stripe push [--dry-run] [--env production]`  — sync plans to Stripe
+- `corral stripe verify`                               — check Stripe sync
+- `corral stripe test --plan <name> --email <email>`   — test billing cycle
+
+### Development
+- `corral seed [--count N] [--plan P] [--reset] [--json]`  — seed test users
+- `corral dev [--port N] [--watch]`                        — standalone dev server
+- `corral rollback [--to <snapshot>] [--list]`             — rollback config
+- `corral promote <email> <role|plan> [--json]`            — change user role/plan
+- `corral llms-txt [--output <path>] [--full] [--update]`  — generate llms.txt
+
+## Gate Modes
+
+blur      — CSS blur with upgrade CTA overlay (best for premium content previews)
+skeleton  — loading skeleton with "unlock" hint (best for charts/real-time data)
+block     — full-width upgrade prompt, hard block
+hide      — completely absent from UI (admin-only features)
+disabled  — visible but disabled with tooltip
+redirect  — server-side redirect to login or upgrade page
+
+## Auth Providers
+
+Supported: google, github, discord, apple, microsoft, twitter, facebook,
+           email (magic_link/otp/password), passkey, totp (2FA), saml, device
+
+Device provider: CLI-to-browser OAuth2 device flow (RFC 8628).
+CLI prints code → user approves in browser → CLI gets token.
+
+## HTTP API
+
+Base: /api/auth and /api/billing (configurable)
+Auth: session cookie OR Authorization: Bearer <token> OR X-API-Key: <key>
+
+### Auth
+GET  /api/auth/session                — get current session + plan + features
+POST /api/auth/sign-up/email          — register (email, password, name)
+POST /api/auth/sign-in/email          — magic link or password sign-in
+POST /api/auth/sign-in/social         — OAuth start ({provider, callbackURL})
+POST /api/auth/sign-out               — clear session
+POST /api/auth/verify-email           — verify magic link token
+
+### Billing
+POST /api/billing/checkout            — create Stripe checkout ({plan, successUrl, cancelUrl})
+GET  /api/billing/portal              — redirect to Stripe Customer Portal
+POST /api/billing/cancel              — cancel subscription at period end
+POST /api/billing/reactivate          — reactivate canceled subscription
+POST /api/billing/webhook             — Stripe webhook (Stripe-only)
+
+### Device Auth
+POST /api/auth/device/authorize       — start device flow ({client_id, scope})
+POST /api/auth/device/token           — poll for token ({grant_type, device_code, client_id})
+POST /api/auth/device/verify          — user approves code ({user_code})
+
+### API Keys
+POST   /api/auth/keys                 — create key ({name, scopes, expiresIn})
+GET    /api/auth/keys                 — list keys
+DELETE /api/auth/keys/:id             — revoke key
+
+### Usage Meters
+POST /api/billing/usage/track         — track usage ({meter, amount})
+GET  /api/billing/usage/:meter        — get meter state
+
+### Admin (requires role:admin)
+GET  /api/admin/users                 — list users (?page&limit&plan&search)
+GET  /api/admin/users/:id             — get user
+POST /api/admin/users/:id/promote     — change role/plan
+
+## Session Object
+
+```typescript
+{
+  user: {
+    id: string,
+    email: string,
+    name?: string,
+    image?: string,
+    role: 'user' | 'admin',
+    createdAt: Date
+  },
+  plan: {
+    id: 'free' | 'pro' | 'enterprise' | 'anonymous',
+    status: 'active' | 'trialing' | 'past_due' | 'canceled',
+    trialEndsAt?: Date,
+    currentPeriodEnd?: Date
+  },
+  features: string[],  // feature names the user can access
+  limits: { [meter: string]: number }  // per-plan meter limits
+}
+```
+
+Anonymous session: { user: null, plan: { id: 'anonymous' }, features: [], limits: {} }
+
+## Gating Hierarchy (evaluation order)
+
+1. Authentication check — is there a valid session?
+2. Role check — does the feature require a role?
+3. Plan check — is the user's plan in the feature's plans list?
+4. Subscription status — is it active/trialing (not canceled/past_due)?
+5. Meter check — has the usage limit been exceeded?
+6. Granted
+
+## Framework Adapters
+
+JS/TS: @corral/next, @corral/express, @corral/hono, @corral/fastify, @corral/react
+Non-JS: corral-py (Python), corral-go (Go), corral (Rust), corral-ruby (Ruby)
+
+Non-JS backends validate sessions by calling GET /api/auth/session with
+the user's Bearer token.
+
+## Databases Supported
+
+sqlite (default), postgres, mysql, turso, cloudflare-d1, planetscale
+Adapters: prisma, drizzle, native
+
+## Environment Variables
+
+Required:
+  CORRAL_SECRET          — 32+ char random string (session signing)
+  DATABASE_URL           — database connection string
+
+Billing (if using Stripe):
+  STRIPE_SECRET_KEY      — sk_test_... or sk_live_...
+  STRIPE_WEBHOOK_SECRET  — whsec_...
+
+Auth providers (per provider):
+  GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+  GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+  SMTP_URL                — for email magic links
+
+## JSON CLI Output Format
+
+Success: { "status": "ok", "command": "...", "result": {...}, "warnings": [], "next_steps": [...] }
+Error:   { "status": "error", "command": "...", "error": { "code": "...", "message": "...", "fix": "..." } }
+Exit code: 0 = success, 1 = error
+
+## Files Generated by corral init
+
+corral.yaml                                    — main config (edit this)
+CORRAL.md                                      — project guide (auto-updated)
+src/lib/corral.ts                              — Corral instance
+src/app/api/auth/[...corral]/route.ts          — auth handlers (Next.js)
+src/app/api/billing/[...corral]/route.ts       — billing handlers (Next.js)
+src/components/corral/FeatureGate.tsx          — gating components
+src/components/corral/PlanGate.tsx
+src/components/corral/AuthGate.tsx
+src/components/corral/PageGate.tsx
+src/app/admin/page.tsx                         — admin dashboard
+
+## More
+
+- Full docs: https://corralauth.dev
+- llms-full.txt (with examples): https://corralauth.dev/llms-full.txt
+- GitHub: https://github.com/llama-farm/corral
+- License: MIT
+- Built by LlamaFarm: https://github.com/llama-farm

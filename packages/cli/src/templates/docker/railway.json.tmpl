@@ -1,0 +1,24 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "supervisord -c /etc/supervisor/conf.d/supervisord.conf",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 5,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "AUTH_PORT": "3456",
+        "AUTH_URL": "http://localhost:3456",
+        "CORRAL_DB_PATH": "/app/data/corral.db",
+        "CORRAL_SECRET": "{{CORRAL_SECRET}}"
+      }
+    }
+  }
+}

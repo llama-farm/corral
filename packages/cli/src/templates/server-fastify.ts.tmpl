@@ -1,0 +1,41 @@
+// {{APP_NAME}} — Corral Auth Server (Fastify)
+// High-performance auth server with schema validation and plugin ecosystem.
+// Run with: npx tsx server/auth.ts
+
+import Fastify from "fastify";
+import fastifyCors from "@fastify/cors";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./corral.js";
+
+const fastify = Fastify({ logger: true });
+const port = parseInt(process.env.CORRAL_PORT || "{{PORT}}");
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// LEARNING #4/#5: CORS with credentials + both localhost variants
+fastify.register(fastifyCors, {
+  origin: [corsOrigin, corsOrigin.replace("localhost", "127.0.0.1")],
+  credentials: true,
+});
+
+// Mount Better Auth via Node handler adapter
+const authHandler = toNodeHandler(auth);
+fastify.all("/api/auth/*", async (request, reply) => {
+  return authHandler(request.raw, reply.raw);
+});
+
+// Health check
+fastify.get("/health", async () => ({ ok: true }));
+
+// LEARNING #7: Bind to 0.0.0.0
+const start = async () => {
+  try {
+    await fastify.listen({ port, host: "0.0.0.0" });
+    console.log(`🤠 Corral auth server (Fastify) running on http://localhost:${port}`);
+    console.log(`   CORS origin: ${corsOrigin}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();

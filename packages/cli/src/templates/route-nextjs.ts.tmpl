@@ -1,0 +1,57 @@
+// {{APP_NAME}} — Corral Auth Route Handler (Next.js App Router)
+// Place at: app/api/auth/[...all]/route.ts
+
+import { auth } from "@/lib/corral";
+import { NextResponse } from "next/server";
+
+async function handleAuth(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  
+  // LEARNING #20: Better Auth sign-out returns empty body which crashes Next.js.
+  // Handle sign-out manually via auth.api + clear cookie with NextResponse.
+  if (url.pathname.endsWith("/sign-out") && req.method === "POST") {
+    try {
+      await auth.api.signOut({ headers: req.headers });
+    } catch { /* OK — session may already be gone */ }
+    
+    const res = NextResponse.json({ success: true });
+    res.cookies.set("better-auth.session_token", "", {
+      path: "/", maxAge: 0, httpOnly: true, sameSite: "lax",
+    });
+    return res;
+  }
+
+  // All other endpoints — ensure non-empty body for Next.js
+  const response = await auth.handler(req);
+  const cloned = response.clone();
+  const text = await cloned.text();
+  
+  if (!text || text.trim() === "") {
+    const headers = new Headers();
+    response.headers.forEach((v, k) => headers.set(k, v));
+    headers.set("Content-Type", "application/json");
+    return new Response(JSON.stringify({ success: true }), {
+      status: response.status, headers,
+    });
+  }
+  
+  return response;
+}
+
+export async function GET(req: Request) {
+  try { return await handleAuth(req); }
+  catch (e: any) {
+    return new Response(JSON.stringify({ error: "Auth error" }), {
+      status: 500, headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+export async function POST(req: Request) {
+  try { return await handleAuth(req); }
+  catch (e: any) {
+    return new Response(JSON.stringify({ error: "Auth error" }), {
+      status: 500, headers: { "Content-Type": "application/json" },
+    });
+  }
+}

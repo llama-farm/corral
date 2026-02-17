@@ -1,0 +1,42 @@
+// {{APP_NAME}} — Corral Auth Server (Express)
+// Standalone auth server for SPA (React/Vite) apps.
+// Run with: npx tsx server/auth.ts (or add to package.json scripts)
+//
+// Your React app talks to this server for all auth operations.
+// Set CORRAL_PORT (default {{PORT}}) and configure your Vite/CRA proxy.
+
+import express from "express";
+import cors from "cors";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./corral.js";
+
+const app = express();
+const port = parseInt(process.env.CORRAL_PORT || "{{PORT}}");
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// LEARNING #4: CORS must explicitly set credentials: true for cookie auth
+// LEARNING #5: Include both localhost and 127.0.0.1 variants
+app.use(cors({
+  origin: [corsOrigin, corsOrigin.replace("localhost", "127.0.0.1")],
+  credentials: true,
+}));
+
+// Mount Better Auth on /api/auth/*
+// Express 5 requires named wildcards (*splat), Express 4 uses bare (*)
+// Auto-detect: try Express 5 syntax first, fall back to Express 4
+const authHandler = toNodeHandler(auth);
+try {
+  app.all("/api/auth/*splat", (req, res) => authHandler(req, res));
+} catch {
+  app.all("/api/auth/*", (req, res) => authHandler(req, res));
+}
+
+// Health check
+app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// LEARNING #7: Bind to 0.0.0.0 — default may only bind IPv6
+app.listen(port, "0.0.0.0", () => {
+  console.log(`🤠 Corral auth server running on http://localhost:${port}`);
+  console.log(`   Auth endpoints: http://localhost:${port}/api/auth/*`);
+  console.log(`   CORS origin: ${corsOrigin}`);
+});

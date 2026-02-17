@@ -1,0 +1,56 @@
+; =============================================================================
+; Corral Supervisord Config — Auth Server + {{BACKEND_LANG}} Backend
+; =============================================================================
+; Two processes, one container. Auth on :3456 (internal), backend on :8000.
+; Both auto-restart. Logs go to stdout/stderr for container log collection.
+; =============================================================================
+
+[supervisord]
+nodaemon=true
+user=corral
+logfile=/dev/null
+logfile_maxbytes=0
+pidfile=/tmp/supervisord.pid
+
+; -----------------------------------------------------------------------------
+; Corral Auth Server (Node.js) — internal only, port 3456
+; -----------------------------------------------------------------------------
+[program:auth]
+command=node /app/server/auth.js
+directory=/app/server
+environment=PORT="3456",AUTH_PORT="3456",CORRAL_DB_PATH="/app/data/corral.db"
+autorestart=true
+startretries=5
+startsecs=3
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+priority=10
+
+; -----------------------------------------------------------------------------
+; Backend ({{BACKEND_LANG}}) — exposed port 8000
+; -----------------------------------------------------------------------------
+[program:backend]
+; {{#if_python}}
+command=/app/venv/bin/uvicorn {{PYTHON_MODULE}}:app --host 0.0.0.0 --port 8000
+; {{/if_python}}
+; {{#if_go}}
+command=/app/backend
+; {{/if_go}}
+; {{#if_rust}}
+command=/app/backend
+; {{/if_rust}}
+; {{#if_ruby}}
+command=bundle exec {{RUBY_CMD}}
+; {{/if_ruby}}
+directory=/app
+environment=PORT="8000",AUTH_URL="http://localhost:3456",CORRAL_DB_PATH="/app/data/corral.db"
+autorestart=true
+startretries=5
+startsecs=3
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+priority=20

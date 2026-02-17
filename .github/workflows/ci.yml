@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npx turbo run build
+
+      - name: TypeScript check
+        run: npx turbo run typecheck
+
+      - name: Lint
+        run: npx turbo run lint
+
+      - name: Test
+        run: npx turbo run test
+        continue-on-error: true  # Tests optional until suite is built out
+
+      - name: Check package sizes
+        run: |
+          echo "=== Package dist sizes ==="
+          du -sh packages/server/dist/ 2>/dev/null || echo "server: no dist"
+          du -sh packages/ui/dist/     2>/dev/null || echo "ui: no dist"
+          du -sh packages/cli/dist/    2>/dev/null || echo "cli: no dist"
+
+      - name: Verify CLI runs
+        run: |
+          cd packages/cli
+          node dist/index.js --help

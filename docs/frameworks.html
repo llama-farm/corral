@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Framework Guides — Corral Docs</title>
+  <meta name="description" content="How to integrate Corral with Next.js, Vite, Express, Hono, Fastify, Python, Go, Rust, and Ruby.">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .fw-section { margin-bottom: 56px; padding-bottom: 40px; border-bottom: 1px solid var(--bg-border); }
+    .fw-section:last-child { border-bottom: none; }
+    .fw-badge { display:inline-flex;align-items:center;gap:6px;background:var(--bg-elevated);border:1px solid var(--bg-border);border-radius:var(--radius);padding:4px 10px;font-size:0.8rem;font-weight:600;color:var(--text-muted);margin-bottom:20px; }
+  </style>
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html" class="active">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">JavaScript</div>
+      <ul class="sidebar-nav">
+        <li><a href="#nextjs-app">Next.js App Router</a></li>
+        <li><a href="#nextjs-pages">Next.js Pages Router</a></li>
+        <li><a href="#vite">React + Vite</a></li>
+        <li><a href="#express">Express</a></li>
+        <li><a href="#hono">Hono</a></li>
+        <li><a href="#fastify">Fastify</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Backend Validation</div>
+      <ul class="sidebar-nav">
+        <li><a href="#python">Python (FastAPI)</a></li>
+        <li><a href="#go">Go</a></li>
+        <li><a href="#rust">Rust (Axum)</a></li>
+        <li><a href="#ruby">Ruby (Rails)</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="cli.html">CLI Reference</a></li>
+        <li><a href="api.html">API Reference</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>Framework Guides</h1>
+    <p class="docs-lead">
+      Corral embeds into your existing framework. The JS/TS adapters handle
+      mounting routes and providing components. Non-JS backends validate
+      sessions by calling Corral's session endpoint.
+    </p>
+
+    <!-- ── Next.js App Router ─────────────────────── -->
+    <div class="fw-section" id="nextjs-app">
+      <span class="fw-badge">Next.js App Router</span>
+      <h2 style="margin-top:0;border-top:none">Next.js — App Router</h2>
+      <p>The recommended setup for Next.js 13+. Corral mounts as catch-all route handlers.</p>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span></div>
+        <pre><code>npm install @corral/core @corral/next</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/lib/corral.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { createCorral } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/core'</span>
+<span class="tok-keyword">import</span> { NextAdapter } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+<span class="tok-keyword">import</span> config <span class="tok-keyword">from</span> <span class="tok-string">'../../../corral.yaml'</span>
+
+<span class="tok-keyword">export const</span> corral = <span class="tok-cmd">createCorral</span>({ config, adapter: NextAdapter })
+<span class="tok-keyword">export const</span> { auth, billing, getSession, requireSession } = corral</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/app/api/auth/[...corral]/route.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { corral } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+<span class="tok-keyword">export const</span> { GET, POST } = corral.auth.handlers</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/app/api/billing/[...corral]/route.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { corral } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+<span class="tok-keyword">export const</span> { GET, POST } = corral.billing.handlers</code></pre>
+      </div>
+
+      <h3>Server Components</h3>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/app/dashboard/page.tsx</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { getSession } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+<span class="tok-keyword">import</span> { FeatureGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+<span class="tok-keyword">import</span> { redirect } <span class="tok-keyword">from</span> <span class="tok-string">'next/navigation'</span>
+
+<span class="tok-keyword">export default async function</span> <span class="tok-cmd">DashboardPage</span>() {
+  <span class="tok-keyword">const</span> session = <span class="tok-keyword">await</span> <span class="tok-cmd">getSession</span>()
+  <span class="tok-keyword">if</span> (!session) <span class="tok-cmd">redirect</span>(<span class="tok-string">'/login'</span>)
+
+  <span class="tok-keyword">return</span> (
+    &lt;div&gt;
+      &lt;h1&gt;Welcome, {session.user.name}&lt;/h1&gt;
+      &lt;p&gt;Plan: {session.plan.id}&lt;/p&gt;
+
+      <span class="tok-comment">{/* Only rendered for pro/enterprise users */}</span>
+      &lt;<span class="tok-cmd">FeatureGate</span> feature=<span class="tok-string">"ai_analysis"</span> session={session}&gt;
+        &lt;AIAnalysisPanel /&gt;
+      &lt;/FeatureGate&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+      </div>
+
+      <h3>Route protection middleware</h3>
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">middleware.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { corralMiddleware } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+<span class="tok-keyword">import type</span> { NextRequest } <span class="tok-keyword">from</span> <span class="tok-string">'next/server'</span>
+
+<span class="tok-keyword">export function</span> <span class="tok-cmd">middleware</span>(req: NextRequest) {
+  <span class="tok-keyword">return</span> <span class="tok-cmd">corralMiddleware</span>(req, {
+    <span class="tok-comment">// Protect these routes — redirect to /login if not authenticated</span>
+    protectedRoutes: [<span class="tok-string">'/dashboard'</span>, <span class="tok-string">'/reports'</span>, <span class="tok-string">'/admin'</span>],
+    <span class="tok-comment">// Require pro plan for these routes</span>
+    planRoutes: {
+      <span class="tok-string">'/reports/advanced'</span>: <span class="tok-string">'pro'</span>,
+      <span class="tok-string">'/admin'</span>: { role: <span class="tok-string">'admin'</span> },
+    }
+  })
+}
+
+<span class="tok-keyword">export const</span> config = {
+  matcher: [<span class="tok-string">'/dashboard/:path*'</span>, <span class="tok-string">'/reports/:path*'</span>, <span class="tok-string">'/admin/:path*'</span>]
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Next.js Pages Router ──────────────────── -->
+    <div class="fw-section" id="nextjs-pages">
+      <span class="fw-badge">Next.js Pages Router</span>
+      <h2 style="margin-top:0;border-top:none">Next.js — Pages Router</h2>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">pages/api/auth/[...corral].ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { corral } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+<span class="tok-keyword">export default</span> corral.auth.pageHandler</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">pages/dashboard.tsx</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { getServerSideSession } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+<span class="tok-keyword">import type</span> { GetServerSideProps } <span class="tok-keyword">from</span> <span class="tok-string">'next'</span>
+
+<span class="tok-keyword">export const</span> getServerSideProps: GetServerSideProps = <span class="tok-keyword">async</span> (ctx) => {
+  <span class="tok-keyword">const</span> session = <span class="tok-keyword">await</span> <span class="tok-cmd">getServerSideSession</span>(ctx)
+  <span class="tok-keyword">if</span> (!session) <span class="tok-keyword">return</span> { redirect: { destination: <span class="tok-string">'/login'</span>, permanent: <span class="tok-keyword">false</span> } }
+  <span class="tok-keyword">return</span> { props: { session } }
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- ── React + Vite ──────────────────────────── -->
+    <div class="fw-section" id="vite">
+      <span class="fw-badge">React + Vite</span>
+      <h2 style="margin-top:0;border-top:none">React + Vite</h2>
+      <p>
+        With Vite, Corral runs on your backend (Express/Hono/Fastify),
+        and the React frontend uses the <code>@corral/react</code> client package.
+      </p>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span></div>
+        <pre><code>npm install @corral/core @corral/express @corral/react   # frontend + backend</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/main.tsx</span><span class="code-lang">tsx</span></div>
+        <pre><code><span class="tok-keyword">import</span> { CorralProvider } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/react'</span>
+<span class="tok-keyword">import</span> App <span class="tok-keyword">from</span> <span class="tok-string">'./App'</span>
+
+<span class="tok-cmd">createRoot</span>(document.<span class="tok-cmd">getElementById</span>(<span class="tok-string">'root'</span>)!).<span class="tok-cmd">render</span>(
+  &lt;<span class="tok-cmd">CorralProvider</span> baseUrl=<span class="tok-string">"/api"</span>&gt;
+    &lt;App /&gt;
+  &lt;/<span class="tok-cmd">CorralProvider</span>&gt;
+)</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/components/Dashboard.tsx</span><span class="code-lang">tsx</span></div>
+        <pre><code><span class="tok-keyword">import</span> { useSession, FeatureGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/react'</span>
+
+<span class="tok-keyword">export function</span> <span class="tok-cmd">Dashboard</span>() {
+  <span class="tok-keyword">const</span> { session, loading } = <span class="tok-cmd">useSession</span>()
+  <span class="tok-keyword">if</span> (loading) <span class="tok-keyword">return</span> &lt;Spinner /&gt;
+  <span class="tok-keyword">if</span> (!session) <span class="tok-keyword">return</span> &lt;LoginPrompt /&gt;
+
+  <span class="tok-keyword">return</span> (
+    &lt;div&gt;
+      &lt;FeatureGate feature=<span class="tok-string">"ai_analysis"</span>&gt;
+        &lt;AIPanel /&gt;
+      &lt;/FeatureGate&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Express ───────────────────────────────── -->
+    <div class="fw-section" id="express">
+      <span class="fw-badge">Express</span>
+      <h2 style="margin-top:0;border-top:none">Express</h2>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/server.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> express <span class="tok-keyword">from</span> <span class="tok-string">'express'</span>
+<span class="tok-keyword">import</span> { createCorral } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/core'</span>
+<span class="tok-keyword">import</span> { ExpressAdapter } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/express'</span>
+<span class="tok-keyword">import</span> config <span class="tok-keyword">from</span> <span class="tok-string">'../corral.yaml'</span>
+
+<span class="tok-keyword">const</span> app = <span class="tok-cmd">express</span>()
+<span class="tok-keyword">const</span> corral = <span class="tok-cmd">createCorral</span>({ config, adapter: ExpressAdapter })
+
+<span class="tok-comment">// Mount Corral routes</span>
+app.<span class="tok-cmd">use</span>(<span class="tok-string">'/api/auth'</span>, corral.auth.router)
+app.<span class="tok-cmd">use</span>(<span class="tok-string">'/api/billing'</span>, corral.billing.router)
+
+<span class="tok-comment">// Protected route</span>
+app.<span class="tok-cmd">get</span>(<span class="tok-string">'/api/intel'</span>, corral.<span class="tok-cmd">requireSession</span>(), <span class="tok-keyword">async</span> (req, res) => {
+  <span class="tok-keyword">const</span> { session } = req
+  <span class="tok-keyword">if</span> (!corral.<span class="tok-cmd">hasFeature</span>(session, <span class="tok-string">'ai_analysis'</span>)) {
+    <span class="tok-keyword">return</span> res.<span class="tok-cmd">status</span>(<span class="tok-number">403</span>).<span class="tok-cmd">json</span>({ error: <span class="tok-string">'upgrade_required'</span> })
+  }
+  res.<span class="tok-cmd">json</span>({ data: <span class="tok-string">'classified'</span> })
+})
+
+app.<span class="tok-cmd">listen</span>(<span class="tok-number">3000</span>)</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Hono ──────────────────────────────────── -->
+    <div class="fw-section" id="hono">
+      <span class="fw-badge">Hono</span>
+      <h2 style="margin-top:0;border-top:none">Hono</h2>
+      <p>Hono runs on Node.js, Cloudflare Workers, Bun, and Deno. Use <code>@corral/hono</code>.</p>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/index.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> { Hono } <span class="tok-keyword">from</span> <span class="tok-string">'hono'</span>
+<span class="tok-keyword">import</span> { corralHono } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/hono'</span>
+<span class="tok-keyword">import</span> config <span class="tok-keyword">from</span> <span class="tok-string">'./corral.yaml'</span>
+
+<span class="tok-keyword">const</span> app = <span class="tok-keyword">new</span> <span class="tok-cmd">Hono</span>()
+<span class="tok-keyword">const</span> { auth, billing, session } = <span class="tok-cmd">corralHono</span>({ config })
+
+app.<span class="tok-cmd">route</span>(<span class="tok-string">'/api/auth'</span>, auth)
+app.<span class="tok-cmd">route</span>(<span class="tok-string">'/api/billing'</span>, billing)
+
+<span class="tok-comment">// Protected route with plan gate</span>
+app.<span class="tok-cmd">get</span>(<span class="tok-string">'/api/intel'</span>, session({ feature: <span class="tok-string">'ai_analysis'</span> }), (c) => {
+  <span class="tok-keyword">return</span> c.<span class="tok-cmd">json</span>({ data: <span class="tok-string">'classified'</span> })
+})
+
+<span class="tok-keyword">export default</span> app</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Fastify ───────────────────────────────── -->
+    <div class="fw-section" id="fastify">
+      <span class="fw-badge">Fastify</span>
+      <h2 style="margin-top:0;border-top:none">Fastify</h2>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/server.ts</span><span class="code-lang">typescript</span></div>
+        <pre><code><span class="tok-keyword">import</span> Fastify <span class="tok-keyword">from</span> <span class="tok-string">'fastify'</span>
+<span class="tok-keyword">import</span> corralPlugin <span class="tok-keyword">from</span> <span class="tok-string">'@corral/fastify'</span>
+
+<span class="tok-keyword">const</span> app = <span class="tok-cmd">Fastify</span>()
+
+<span class="tok-keyword">await</span> app.<span class="tok-cmd">register</span>(corralPlugin, {
+  configPath: <span class="tok-string">'./corral.yaml'</span>,
+  prefix: <span class="tok-string">'/api'</span>
+})
+
+app.<span class="tok-cmd">get</span>(<span class="tok-string">'/api/intel'</span>, {
+  preHandler: [app.corral.<span class="tok-cmd">requireFeature</span>(<span class="tok-string">'ai_analysis'</span>)]
+}, <span class="tok-keyword">async</span> (req, reply) => {
+  <span class="tok-keyword">return</span> { data: <span class="tok-string">'classified'</span>, user: req.corralSession.user.email }
+})</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Python ───────────────────────────────── -->
+    <div class="fw-section" id="python">
+      <span class="fw-badge">Python · FastAPI</span>
+      <h2 style="margin-top:0;border-top:none">Python — FastAPI</h2>
+      <p>
+        Non-JS backends validate sessions by calling Corral's session endpoint.
+        Use the <code>corral-py</code> helper library, or call the API directly.
+      </p>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span></div>
+        <pre><code>pip install corral-py</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">app/auth.py</span><span class="code-lang">python</span></div>
+        <pre><code><span class="tok-keyword">from</span> corral_py <span class="tok-keyword">import</span> CorralClient
+<span class="tok-keyword">from</span> fastapi <span class="tok-keyword">import</span> Depends, HTTPException, Request
+
+corral = CorralClient(base_url=<span class="tok-string">"https://horizon.mil"</span>)
+
+<span class="tok-keyword">async def</span> <span class="tok-cmd">require_session</span>(request: Request):
+    token = request.headers.get(<span class="tok-string">"Authorization"</span>, <span class="tok-string">""</span>).removeprefix(<span class="tok-string">"Bearer "</span>)
+    session = <span class="tok-keyword">await</span> corral.<span class="tok-cmd">get_session</span>(token)
+    <span class="tok-keyword">if not</span> session:
+        <span class="tok-keyword">raise</span> HTTPException(status_code=<span class="tok-number">401</span>)
+    <span class="tok-keyword">return</span> session
+
+<span class="tok-keyword">async def</span> <span class="tok-cmd">require_feature</span>(feature: str):
+    <span class="tok-keyword">async def</span> <span class="tok-cmd">dep</span>(session=Depends(require_session)):
+        <span class="tok-keyword">if</span> feature <span class="tok-keyword">not in</span> session[<span class="tok-string">"features"</span>]:
+            <span class="tok-keyword">raise</span> HTTPException(status_code=<span class="tok-number">403</span>, detail=<span class="tok-string">"upgrade_required"</span>)
+        <span class="tok-keyword">return</span> session
+    <span class="tok-keyword">return</span> dep
+
+<span class="tok-comment"># Usage in route:</span>
+<span class="tok-keyword">from</span> fastapi <span class="tok-keyword">import</span> APIRouter
+router = APIRouter()
+
+@router.<span class="tok-cmd">get</span>(<span class="tok-string">"/intel/analysis"</span>)
+<span class="tok-keyword">async def</span> <span class="tok-cmd">get_analysis</span>(session=Depends(require_feature(<span class="tok-string">"ai_analysis"</span>))):
+    <span class="tok-keyword">return</span> {<span class="tok-string">"analyst"</span>: session[<span class="tok-string">"user"</span>][<span class="tok-string">"email"</span>], <span class="tok-string">"data"</span>: <span class="tok-string">"classified"</span>}</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Go ───────────────────────────────────── -->
+    <div class="fw-section" id="go">
+      <span class="fw-badge">Go</span>
+      <h2 style="margin-top:0;border-top:none">Go</h2>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span></div>
+        <pre><code>go get github.com/llama-farm/corral-go</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">middleware/auth.go</span><span class="code-lang">go</span></div>
+        <pre><code><span class="tok-keyword">package</span> middleware
+
+<span class="tok-keyword">import</span> (
+    <span class="tok-string">"net/http"</span>
+    corral <span class="tok-string">"github.com/llama-farm/corral-go"</span>
+)
+
+<span class="tok-keyword">var</span> client = corral.<span class="tok-cmd">NewClient</span>(<span class="tok-string">"https://horizon.mil"</span>)
+
+<span class="tok-keyword">func</span> <span class="tok-cmd">RequireFeature</span>(feature <span class="tok-keyword">string</span>) <span class="tok-keyword">func</span>(http.Handler) http.Handler {
+    <span class="tok-keyword">return func</span>(next http.Handler) http.Handler {
+        <span class="tok-keyword">return</span> http.<span class="tok-cmd">HandlerFunc</span>(<span class="tok-keyword">func</span>(w http.ResponseWriter, r *http.Request) {
+            session, err := client.<span class="tok-cmd">GetSession</span>(r)
+            <span class="tok-keyword">if</span> err != <span class="tok-keyword">nil</span> || !session.<span class="tok-cmd">HasFeature</span>(feature) {
+                http.<span class="tok-cmd">Error</span>(w, <span class="tok-string">"forbidden"</span>, <span class="tok-number">403</span>)
+                <span class="tok-keyword">return</span>
+            }
+            next.<span class="tok-cmd">ServeHTTP</span>(w, r.<span class="tok-cmd">WithContext</span>(<span class="tok-cmd">ContextWithSession</span>(r.Context(), session)))
+        })
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Rust ─────────────────────────────────── -->
+    <div class="fw-section" id="rust">
+      <span class="fw-badge">Rust · Axum</span>
+      <h2 style="margin-top:0;border-top:none">Rust — Axum</h2>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">Cargo.toml</span><span class="code-lang">toml</span></div>
+        <pre><code>[dependencies]
+corral = <span class="tok-string">"0.1"</span></code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">src/auth.rs</span><span class="code-lang">rust</span></div>
+        <pre><code><span class="tok-keyword">use</span> axum::{extract::FromRequestParts, http::StatusCode};
+<span class="tok-keyword">use</span> corral::{CorralClient, Session};
+
+<span class="tok-keyword">pub struct</span> RequireFeature(pub Session);
+
+<span class="tok-keyword">impl</span>&lt;S&gt; FromRequestParts&lt;S&gt; <span class="tok-keyword">for</span> RequireFeature {
+    <span class="tok-keyword">type</span> Rejection = StatusCode;
+
+    <span class="tok-keyword">async fn</span> <span class="tok-cmd">from_request_parts</span>(parts: &<span class="tok-keyword">mut</span> Parts, _: &S) 
+        -&gt; <span class="tok-keyword">Result</span>&lt;<span class="tok-keyword">Self</span>, StatusCode&gt; 
+    {
+        <span class="tok-keyword">let</span> token = <span class="tok-cmd">extract_bearer</span>(&parts.headers)
+            .<span class="tok-cmd">ok_or</span>(StatusCode::UNAUTHORIZED)?;
+        
+        <span class="tok-keyword">let</span> session = CORRAL_CLIENT.<span class="tok-cmd">get_session</span>(&token).<span class="tok-keyword">await</span>
+            .<span class="tok-cmd">map_err</span>(|_| StatusCode::UNAUTHORIZED)?;
+        
+        <span class="tok-keyword">Ok</span>(<span class="tok-cmd">RequireFeature</span>(session))
+    }
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- ── Ruby ─────────────────────────────────── -->
+    <div class="fw-section" id="ruby">
+      <span class="fw-badge">Ruby · Rails</span>
+      <h2 style="margin-top:0;border-top:none">Ruby — Rails</h2>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-lang">bash</span></div>
+        <pre><code>gem install corral-ruby</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-header"><span class="code-filename">app/controllers/application_controller.rb</span><span class="code-lang">ruby</span></div>
+        <pre><code><span class="tok-keyword">class</span> ApplicationController &lt; ActionController::Base
+  <span class="tok-keyword">include</span> Corral::Rails
+
+  CORRAL_BASE_URL = <span class="tok-string">"https://horizon.mil"</span>
+
+  <span class="tok-keyword">before_action</span> :require_session!
+
+  <span class="tok-keyword">def</span> <span class="tok-cmd">require_feature!</span>(feature)
+    <span class="tok-keyword">unless</span> corral_session[<span class="tok-string">"features"</span>].include?(feature.to_s)
+      render json: { error: <span class="tok-string">"upgrade_required"</span> }, status: :forbidden
+    <span class="tok-keyword">end</span>
+  <span class="tok-keyword">end</span>
+<span class="tok-keyword">end</span>
+
+<span class="tok-comment"># In IntelController:</span>
+<span class="tok-keyword">class</span> IntelController &lt; ApplicationController
+  <span class="tok-keyword">before_action</span> { require_feature! :ai_analysis }
+
+  <span class="tok-keyword">def</span> <span class="tok-cmd">analysis</span>
+    render json: { analyst: corral_session[<span class="tok-string">"user"</span>][<span class="tok-string">"email"</span>] }
+  <span class="tok-keyword">end</span>
+<span class="tok-keyword">end</span></code></pre>
+      </div>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="cli.html">← CLI Reference</a>
+        <a href="billing.html">Stripe Billing →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

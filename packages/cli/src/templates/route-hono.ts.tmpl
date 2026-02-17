@@ -1,0 +1,24 @@
+// {{APP_NAME}} — Corral Auth Route (Hono)
+// Mount this in your existing Hono app.
+// Better Auth handles all /api/auth/* routes natively via Request/Response.
+
+import { Hono } from "hono";
+import { auth } from "../lib/corral";
+
+const authRoutes = new Hono();
+
+// Better Auth handler — works with raw Request objects (no adapter needed)
+authRoutes.all("/api/auth/*", (c) => {
+  try {
+    return auth.handler(c.req.raw);
+  } catch (e: any) {
+    console.error("[Corral] Auth error:", e.message);
+    return c.json({ error: "Auth error" }, 500);
+  }
+});
+
+export { authRoutes };
+
+// Usage in your main app:
+// import { authRoutes } from "./auth";
+// app.route("/", authRoutes);

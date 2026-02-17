@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Integration — Corral Docs</title>
+  <meta name="description" content="How AI agents use Corral: llms.txt, CORRAL.md, --json CLI, and the 9-command workflow.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html" class="active">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">On This Page</div>
+      <ul class="sidebar-nav">
+        <li><a href="#design-goals">Design Goals</a></li>
+        <li><a href="#llms-txt">llms.txt</a></li>
+        <li><a href="#corral-md">CORRAL.md</a></li>
+        <li><a href="#json-output">--json Output</a></li>
+        <li><a href="#nine-commands">9-Command Workflow</a></li>
+        <li><a href="#idempotent">Idempotent Commands</a></li>
+        <li><a href="#mcp">MCP Integration</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="cli.html">CLI Reference</a></li>
+        <li><a href="llms.txt">llms.txt</a></li>
+        <li><a href="llms-full.txt">llms-full.txt</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>Agent Integration</h1>
+    <p class="docs-lead">
+      Corral is designed to be used by AI agents, not just humans.
+      Every decision — CLI output format, command structure, file generation —
+      is made with agents as the primary consumer.
+    </p>
+
+    <!-- ── Design Goals ─────────────────────────────── -->
+    <h2 id="design-goals">Design Goals</h2>
+    <p>The agent-native design has four principles:</p>
+    <ol>
+      <li><strong>Discover without reading docs</strong> — <code>/api/llms.txt</code> and <code>CORRAL.md</code> give agents everything they need about a specific project.</li>
+      <li><strong>Parse without screen-scraping</strong> — Every command has <code>--json</code> mode with consistent structure and exit codes.</li>
+      <li><strong>Act without side effects</strong> — <code>corral analyze</code> and <code>--dry-run</code> flags let agents understand state before making changes.</li>
+      <li><strong>Recover without human help</strong> — <code>corral doctor</code> diagnoses problems and suggests fixes; <code>corral rollback</code> undoes changes.</li>
+    </ol>
+
+    <!-- ── llms.txt ─────────────────────────────────── -->
+    <h2 id="llms-txt">llms.txt</h2>
+    <p>
+      Every Corral app automatically serves an <code>llms.txt</code> at
+      <code>/api/llms.txt</code>. It follows the
+      <a href="https://llmstxt.org" target="_blank" rel="noopener">llms.txt spec</a>
+      and describes the app's specific Corral configuration.
+    </p>
+    <p>
+      An agent reading this file knows:
+    </p>
+    <ul>
+      <li>What the app is called and what it does</li>
+      <li>Which auth providers are configured</li>
+      <li>What plans and features exist</li>
+      <li>What API endpoints are available</li>
+      <li>How to authenticate requests</li>
+      <li>What usage limits apply per plan</li>
+    </ul>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">GET /api/llms.txt — example output for HORIZON</span><span class="code-lang">text</span></div>
+      <pre><code># HORIZON
+
+> Military intelligence analysis dashboard.
+> Auth + billing provided by Corral (https://corralauth.dev).
+
+## Auth
+
+Sign in with Google or email magic link.
+Session cookie: corral-session (HttpOnly, SameSite=Lax)
+Bearer token: Authorization: Bearer &lt;token&gt; (for API access)
+
+POST /api/auth/sign-in/email    — start magic link
+POST /api/auth/sign-in/social   — OAuth redirect (provider=google)
+GET  /api/auth/session          — get current session (JSON)
+POST /api/auth/sign-out         — sign out
+
+## Plans
+
+- free ($0/mo): basic_search, export_csv
+  - API calls: 500/month (block on overage)
+  - Export rows: 1,000/month
+
+- pro ($49/mo, 14-day trial): +ai_analysis, real_time_feed
+  - API calls: 10,000/month (block on overage)
+  - Export rows: 100,000/month
+
+- enterprise (custom): +bulk_export, dedicated support
+
+## API
+
+All API endpoints require authentication unless noted.
+Base URL: https://horizon.mil/api
+
+GET  /api/auth/session       — { user, plan, features, limits }
+POST /api/billing/checkout   — { plan } → { url }
+GET  /api/billing/portal     — → Stripe Customer Portal
+
+POST /api/billing/device/authorize  — start device auth flow
+POST /api/billing/device/token      — poll for device token
+
+## Feature Gates
+
+ai_analysis   — plans: pro, enterprise  — gate: blur
+real_time_feed — plans: pro, enterprise — gate: skeleton
+bulk_export    — plans: enterprise      — gate: block
+admin_console  — roles: admin           — gate: hide
+
+## Upgrade
+
+Redirect users to /pricing or POST /api/billing/checkout with { plan: "pro" }
+
+## More
+
+- Full docs: https://horizon.mil/docs
+- llms-full.txt: https://horizon.mil/api/llms-full.txt</code></pre>
+    </div>
+
+    <h3>Generate llms.txt</h3>
+    <p>
+      You can generate or preview the <code>llms.txt</code> without running the app:
+    </p>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral llms-txt</span>
+        <span class="terminal-line output"># HORIZON</span>
+        <span class="terminal-line output">...</span>
+        <span class="terminal-line blank"></span>
+        <span class="terminal-line cmd">corral llms-txt --output public/llms.txt</span>
+        <span class="terminal-line success">Written to public/llms.txt</span>
+      </div>
+    </div>
+
+    <!-- ── CORRAL.md ────────────────────────────────── -->
+    <h2 id="corral-md">CORRAL.md</h2>
+    <p>
+      <code>CORRAL.md</code> is a project-specific guide generated at
+      <code>corral init</code> time and updated by every <code>corral add</code>.
+      It lives in the project root and is designed to be included in an agent's
+      system prompt or context window.
+    </p>
+    <p>
+      It answers the questions an agent needs to make changes to Corral config:
+    </p>
+    <ul>
+      <li>What framework is this? What adapter is installed?</li>
+      <li>Where are the route handlers?</li>
+      <li>What features and plans are active?</li>
+      <li>What commands should I run to add X?</li>
+      <li>How do I test auth locally?</li>
+    </ul>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">CORRAL.md — example for HORIZON</span><span class="code-lang">markdown</span></div>
+      <pre><code># Corral in HORIZON
+
+Corral v0.1.0 · Next.js 14 (App Router) · PostgreSQL (Prisma)
+
+## Auth Routes
+
+- Auth handler:    src/app/api/auth/[...corral]/route.ts
+- Billing handler: src/app/api/billing/[...corral]/route.ts
+- Admin page:      src/app/admin/page.tsx
+- Login page:      /api/auth/signin (auto-generated)
+- Device verify:   /auth/activate
+
+## Active Features
+
+| Feature       | Plans                  | Gate     |
+|---------------|------------------------|----------|
+| basic_search  | free, pro, enterprise  | (none)   |
+| export_csv    | free, pro, enterprise  | (none)   |
+| ai_analysis   | pro, enterprise        | blur     |
+| real_time_feed| pro, enterprise        | skeleton |
+| bulk_export   | enterprise             | block    |
+| admin_console | role:admin             | hide     |
+
+## Active Plans
+
+| Plan        | Price | Stripe Product     |
+|-------------|-------|--------------------|
+| free        | $0    | (none)             |
+| pro         | $49   | prod_R2xK9mN2aLp   |
+| enterprise  | custom| (manual invoicing) |
+
+## Adding a new feature
+
+corral add feature &lt;name&gt; --plans &lt;list&gt; --gate &lt;mode&gt;
+
+## Adding a new plan
+
+corral add plan &lt;name&gt; --price &lt;n&gt; --interval month
+corral stripe push  # sync to Stripe
+
+## Testing auth locally
+
+corral seed --count 3 --json
+npm run dev
+# Then sign in at http://localhost:3000/api/auth/signin
+
+## Environment variables required
+
+CORRAL_SECRET, DATABASE_URL, STRIPE_SECRET_KEY,
+STRIPE_WEBHOOK_SECRET, GOOGLE_CLIENT_ID,
+GOOGLE_CLIENT_SECRET, SMTP_URL</code></pre>
+    </div>
+
+    <h3>Keep CORRAL.md current</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code><span class="tok-comment"># After any corral add command, CORRAL.md is auto-updated</span>
+corral add feature threat_map --plans enterprise --gate block
+<span class="tok-comment"># CORRAL.md updated: threat_map row added to features table</span>
+
+<span class="tok-comment"># Force regenerate from current corral.yaml state:</span>
+corral llms-txt --update</code></pre>
+    </div>
+
+    <!-- ── --json Output ────────────────────────────── -->
+    <h2 id="json-output">--json Output</h2>
+    <p>
+      Every CLI command accepts <code>--json</code> and returns structured output.
+      Exit code <code>0</code> = success, <code>1</code> = error with details.
+    </p>
+
+    <h3>Standard response envelope</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">json</span></div>
+      <pre><code><span class="tok-comment">// Success</span>
+{
+  <span class="tok-string">"status"</span>: <span class="tok-string">"ok"</span>,
+  <span class="tok-string">"command"</span>: <span class="tok-string">"corral add feature"</span>,
+  <span class="tok-string">"result"</span>: { ... },     <span class="tok-comment">// command-specific data</span>
+  <span class="tok-string">"warnings"</span>: [],
+  <span class="tok-string">"next_steps"</span>: [<span class="tok-string">"corral stripe push"</span>, <span class="tok-string">"corral validate"</span>]
+}
+
+<span class="tok-comment">// Error</span>
+{
+  <span class="tok-string">"status"</span>: <span class="tok-string">"error"</span>,
+  <span class="tok-string">"command"</span>: <span class="tok-string">"corral validate"</span>,
+  <span class="tok-string">"error"</span>: {
+    <span class="tok-string">"code"</span>: <span class="tok-string">"ENV_MISSING"</span>,
+    <span class="tok-string">"message"</span>: <span class="tok-string">"STRIPE_SECRET_KEY is not set"</span>,
+    <span class="tok-string">"fix"</span>: <span class="tok-string">"Add STRIPE_SECRET_KEY=sk_test_... to .env.local"</span>
+  }
+}</code></pre>
+    </div>
+
+    <h3>Using --json in agent code</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">python</span></div>
+      <pre><code><span class="tok-keyword">import</span> subprocess, json
+
+<span class="tok-keyword">def</span> <span class="tok-cmd">corral</span>(*args):
+    result = subprocess.<span class="tok-cmd">run</span>(
+        [<span class="tok-string">"corral"</span>, *args, <span class="tok-string">"--json"</span>],
+        capture_output=<span class="tok-keyword">True</span>, text=<span class="tok-keyword">True</span>
+    )
+    data = json.<span class="tok-cmd">loads</span>(result.stdout)
+    <span class="tok-keyword">if</span> result.returncode != <span class="tok-number">0</span>:
+        <span class="tok-keyword">raise</span> RuntimeError(data[<span class="tok-string">"error"</span>][<span class="tok-string">"message"</span>])
+    <span class="tok-keyword">return</span> data
+
+<span class="tok-comment"># Agent workflow:</span>
+analysis = <span class="tok-cmd">corral</span>(<span class="tok-string">"analyze"</span>)
+print(f<span class="tok-string">"Framework: {analysis['result']['framework']}"</span>)
+
+result = <span class="tok-cmd">corral</span>(<span class="tok-string">"init"</span>, <span class="tok-string">"--yes"</span>)
+<span class="tok-keyword">for</span> step <span class="tok-keyword">in</span> result[<span class="tok-string">"next_steps"</span>]:
+    print(f<span class="tok-string">"Next: {step}"</span>)</code></pre>
+    </div>
+
+    <!-- ── 9-Command Workflow ────────────────────────── -->
+    <h2 id="nine-commands">The 9-Command Workflow</h2>
+    <p>
+      This is the canonical sequence an agent uses to add full auth + billing + gating
+      to a bare Next.js app like HORIZON. It's idempotent — run it twice and it's fine.
+    </p>
+
+    <div class="workflow-steps">
+      <div class="workflow-step">
+        <div class="workflow-num">1</div>
+        <div>
+          <div class="workflow-cmd">corral analyze --json</div>
+          <div class="workflow-what">Read-only. Detect framework, database, existing auth. Parse JSON to decide what to do next.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">2</div>
+        <div>
+          <div class="workflow-cmd">corral init --yes --json</div>
+          <div class="workflow-what">Scaffold everything: corral.yaml, route handlers, components, CORRAL.md. Non-interactive.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">3</div>
+        <div>
+          <div class="workflow-cmd">corral add provider google --json</div>
+          <div class="workflow-what">Add Google OAuth. Updates corral.yaml and generates callback route.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">4</div>
+        <div>
+          <div class="workflow-cmd">corral add plan pro --price 49 --json</div>
+          <div class="workflow-what">Define paid plan. Updates corral.yaml only — Stripe sync happens in step 7.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">5</div>
+        <div>
+          <div class="workflow-cmd">corral add feature ai_analysis --plans pro --gate blur --json</div>
+          <div class="workflow-what">Define a feature gate. YAML only — no code change needed.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">6</div>
+        <div>
+          <div class="workflow-cmd">corral add meter api_calls --free 500 --pro 10000 --overage block --json</div>
+          <div class="workflow-what">Add a usage meter with per-plan limits.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">7</div>
+        <div>
+          <div class="workflow-cmd">corral stripe push --json</div>
+          <div class="workflow-what">Sync plans to Stripe. Creates Products, Prices, registers webhook. Returns price IDs.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">8</div>
+        <div>
+          <div class="workflow-cmd">corral validate --strict --json</div>
+          <div class="workflow-what">Verify the entire config: env vars, DB connection, Stripe sync, feature consistency. Exit 0 = deploy-ready.</div>
+        </div>
+      </div>
+      <div class="workflow-step">
+        <div class="workflow-num">9</div>
+        <div>
+          <div class="workflow-cmd">corral seed --count 3 --json</div>
+          <div class="workflow-what">Create test users (one per plan) for local testing. Returns user IDs and credentials.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Full agent script</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code><span class="tok-comment">#!/bin/bash
+# Agent: add Corral auth + billing to HORIZON</span>
+set -e
+
+<span class="tok-comment"># 1. Understand the project</span>
+ANALYSIS=$(corral analyze --json)
+echo "Framework: $(echo $ANALYSIS | jq -r '.result.framework')"
+
+<span class="tok-comment"># 2. Scaffold</span>
+corral init --yes --json | jq '.files_created[]'
+
+<span class="tok-comment"># 3-6. Add providers, plan, features, meters</span>
+corral add provider google --json
+corral add plan pro --price 49 --trial 14 --json
+corral add feature ai_analysis --plans pro --gate blur --json
+corral add meter api_calls --free 500 --pro 10000 --overage block --json
+
+<span class="tok-comment"># 7. Stripe sync</span>
+STRIPE=$(corral stripe push --json)
+echo "Pro price ID: $(echo $STRIPE | jq -r '.result.prices.pro')"
+
+<span class="tok-comment"># 8. Validate — exit non-zero on any error</span>
+corral validate --strict --json
+
+<span class="tok-comment"># 9. Seed test users</span>
+SEED=$(corral seed --count 1 --json)
+echo "Test user: $(echo $SEED | jq -r '.result.users[0].email')"
+
+echo "✓ Corral installed successfully"</code></pre>
+    </div>
+
+    <!-- ── Idempotent ────────────────────────────────── -->
+    <h2 id="idempotent">Idempotency</h2>
+    <p>
+      All <code>corral add</code> commands are idempotent. Running them twice
+      produces the same result as running them once. This is critical for agents
+      that may retry on failure.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Command</th><th>Run twice?</th><th>Behavior</th></tr></thead>
+        <tbody>
+          <tr><td><code>corral init</code></td><td>Safe</td><td>Skips files that already exist; updates corral.yaml</td></tr>
+          <tr><td><code>corral add feature X</code></td><td>Safe</td><td>No-op if feature X already defined</td></tr>
+          <tr><td><code>corral add provider google</code></td><td>Safe</td><td>No-op if google already in providers list</td></tr>
+          <tr><td><code>corral stripe push</code></td><td>Safe</td><td>Updates existing Stripe products (no duplicates)</td></tr>
+          <tr><td><code>corral seed</code></td><td>Safe with <code>--reset</code></td><td>By default, skips existing test users</td></tr>
+          <tr><td><code>corral validate</code></td><td>Always safe</td><td>Read-only check</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── MCP ──────────────────────────────────────── -->
+    <h2 id="mcp">MCP Integration (Planned)</h2>
+    <p>
+      Corral will ship an MCP (Model Context Protocol) server that exposes
+      all CLI commands as MCP tools. This allows agents to use Corral through
+      standard MCP tooling rather than shell subprocess calls.
+    </p>
+
+    <div class="callout info">
+      <div class="callout-title">Coming in v0.2</div>
+      The MCP server is planned for v0.2. It will expose:
+      <code>corral_analyze</code>, <code>corral_init</code>, <code>corral_add_feature</code>,
+      <code>corral_add_plan</code>, <code>corral_validate</code>, <code>corral_stripe_push</code>,
+      and more as MCP tools with full JSON schemas.
+    </div>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">mcp.json (future)</span><span class="code-lang">json</span></div>
+      <pre><code>{
+  <span class="tok-string">"mcpServers"</span>: {
+    <span class="tok-string">"corral"</span>: {
+      <span class="tok-string">"command"</span>: <span class="tok-string">"npx"</span>,
+      <span class="tok-string">"args"</span>: [<span class="tok-string">"@corral/mcp"</span>],
+      <span class="tok-string">"env"</span>: {
+        <span class="tok-string">"CORRAL_CONFIG"</span>: <span class="tok-string">"./corral.yaml"</span>
+      }
+    }
+  }
+}</code></pre>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="gating.html">← Feature Gating</a>
+        <a href="api.html">API Reference →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

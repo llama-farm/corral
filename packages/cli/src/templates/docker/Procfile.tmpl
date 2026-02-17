@@ -1,0 +1,14 @@
+# Corral Procfile — runs auth server + backend in one dyno/service
+# Auth on internal port 3456, backend on $PORT (set by platform)
+# {{#if_python}}
+web: node server/auth.js & /app/venv/bin/uvicorn {{PYTHON_MODULE}}:app --host 0.0.0.0 --port ${PORT:-8000}
+# {{/if_python}}
+# {{#if_go}}
+web: node server/auth.js & ./backend
+# {{/if_go}}
+# {{#if_rust}}
+web: node server/auth.js & ./backend
+# {{/if_rust}}
+# {{#if_ruby}}
+web: node server/auth.js & bundle exec {{RUBY_CMD}}
+# {{/if_ruby}}

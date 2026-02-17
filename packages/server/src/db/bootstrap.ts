@@ -1,0 +1,216 @@
+/**
+ * Auto-bootstrap database for Better Auth.
+ * 
+ * PRINCIPLE: The database should just work on first run. Zero manual migration steps.
+ * If the database doesn't exist, create it. If tables are missing, create them.
+ * This runs on every server start and is fully idempotent (CREATE IF NOT EXISTS).
+ */
+
+import type { CorralConfig } from "../config/schema.js";
+
+const BETTER_AUTH_TABLES_SQLITE = `
+  CREATE TABLE IF NOT EXISTS "user" (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    emailVerified INTEGER NOT NULL DEFAULT 0,
+    image TEXT,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+    role TEXT DEFAULT 'user',
+    banned INTEGER DEFAULT 0,
+    banReason TEXT,
+    banExpires TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS "session" (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    expiresAt TEXT NOT NULL,
+    ipAddress TEXT,
+    userAgent TEXT,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS "account" (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    accountId TEXT NOT NULL,
+    providerId TEXT NOT NULL,
+    accessToken TEXT,
+    refreshToken TEXT,
+    accessTokenExpiresAt TEXT,
+    refreshTokenExpiresAt TEXT,
+    scope TEXT,
+    password TEXT,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS "verification" (
+    id TEXT PRIMARY KEY,
+    identifier TEXT NOT NULL,
+    value TEXT NOT NULL,
+    expiresAt TEXT NOT NULL,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Indexes for performance
+  CREATE INDEX IF NOT EXISTS idx_session_token ON "session"(token);
+  CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"(userId);
+  CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"(userId);
+  CREATE INDEX IF NOT EXISTS idx_user_email ON "user"(email);
+`;
+
+const BETTER_AUTH_TABLES_PG = `
+  CREATE TABLE IF NOT EXISTS "user" (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    image TEXT,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    role TEXT DEFAULT 'user',
+    banned BOOLEAN DEFAULT false,
+    "banReason" TEXT,
+    "banExpires" TIMESTAMPTZ
+  );
+
+  CREATE TABLE IF NOT EXISTS "session" (
+    id TEXT PRIMARY KEY,
+    "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    "expiresAt" TIMESTAMPTZ NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS "account" (
+    id TEXT PRIMARY KEY,
+    "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMPTZ,
+    "refreshTokenExpiresAt" TIMESTAMPTZ,
+    scope TEXT,
+    password TEXT,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS "verification" (
+    id TEXT PRIMARY KEY,
+    identifier TEXT NOT NULL,
+    value TEXT NOT NULL,
+    "expiresAt" TIMESTAMPTZ NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_session_token ON "session"(token);
+  CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"("userId");
+  CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"("userId");
+  CREATE INDEX IF NOT EXISTS idx_user_email ON "user"(email);
+`;
+
+// Corral's own usage tables
+const USAGE_TABLES_SQLITE = `
+  CREATE TABLE IF NOT EXISTS "usage_events" (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    meterId TEXT NOT NULL,
+    value REAL NOT NULL DEFAULT 1,
+    createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS "product_config" (
+    id TEXT PRIMARY KEY,
+    config TEXT NOT NULL,
+    updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_usage_user_meter ON "usage_events"(userId, meterId);
+  CREATE INDEX IF NOT EXISTS idx_usage_created ON "usage_events"(createdAt);
+
+  CREATE TABLE IF NOT EXISTS "usage" (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    meterId TEXT NOT NULL,
+    count INTEGER DEFAULT 0,
+    periodStart TEXT NOT NULL,
+    periodEnd TEXT NOT NULL,
+    UNIQUE(userId, meterId, periodStart)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_usage_user_meter_period ON "usage"(userId, meterId, periodStart);
+`;
+
+const USAGE_TABLES_PG = `
+  CREATE TABLE IF NOT EXISTS "usage_events" (
+    id SERIAL PRIMARY KEY,
+    "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    "meterId" TEXT NOT NULL,
+    value REAL NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS "product_config" (
+    id TEXT PRIMARY KEY,
+    config JSONB NOT NULL,
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_usage_user_meter ON "usage_events"("userId", "meterId");
+  CREATE INDEX IF NOT EXISTS idx_usage_created ON "usage_events"("createdAt");
+
+  CREATE TABLE IF NOT EXISTS "usage" (
+    id TEXT PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "meterId" TEXT NOT NULL,
+    count INTEGER DEFAULT 0,
+    "periodStart" TEXT NOT NULL,
+    "periodEnd" TEXT NOT NULL,
+    UNIQUE("userId", "meterId", "periodStart")
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_usage_user_meter_period ON "usage"("userId", "meterId", "periodStart");
+`;
+
+/**
+ * Bootstrap the database: create all tables if they don't exist.
+ * Call this on server startup. Fully idempotent.
+ */
+export function bootstrapDatabase(db: any, adapter: string = "sqlite"): void {
+  const isPg = adapter === "pg" || adapter === "postgres" || adapter === "postgresql";
+  
+  if (isPg) {
+    // For pg Pool, use query()
+    if (typeof db.query === "function") {
+      db.query(BETTER_AUTH_TABLES_PG).catch((e: any) => {
+        console.error("[Corral] Failed to bootstrap PG auth tables:", e.message);
+      });
+      db.query(USAGE_TABLES_PG).catch((e: any) => {
+        console.error("[Corral] Failed to bootstrap PG usage tables:", e.message);
+      });
+    }
+  } else {
+    // For better-sqlite3, use exec()
+    if (typeof db.exec === "function") {
+      try {
+        db.pragma("journal_mode = WAL");
+        db.exec(BETTER_AUTH_TABLES_SQLITE);
+        db.exec(USAGE_TABLES_SQLITE);
+      } catch (e: any) {
+        console.error("[Corral] Failed to bootstrap SQLite tables:", e.message);
+      }
+    }
+  }
+}

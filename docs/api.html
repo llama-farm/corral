@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Reference — Corral Docs</title>
+  <meta name="description" content="Complete HTTP API reference for Corral: auth, billing, device auth, API keys, usage meters, and admin endpoints.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html" class="active">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Auth</div>
+      <ul class="sidebar-nav">
+        <li><a href="#auth-session">GET /session</a></li>
+        <li><a href="#auth-signup">POST /sign-up/email</a></li>
+        <li><a href="#auth-signin-email">POST /sign-in/email</a></li>
+        <li><a href="#auth-signin-social">POST /sign-in/social</a></li>
+        <li><a href="#auth-signout">POST /sign-out</a></li>
+        <li><a href="#auth-verify">POST /verify-email</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Billing</div>
+      <ul class="sidebar-nav">
+        <li><a href="#billing-checkout">POST /checkout</a></li>
+        <li><a href="#billing-portal">GET /portal</a></li>
+        <li><a href="#billing-cancel">POST /cancel</a></li>
+        <li><a href="#billing-reactivate">POST /reactivate</a></li>
+        <li><a href="#billing-webhook">POST /webhook</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Device Auth</div>
+      <ul class="sidebar-nav">
+        <li><a href="#device-authorize">POST /device/authorize</a></li>
+        <li><a href="#device-token">POST /device/token</a></li>
+        <li><a href="#device-verify">POST /device/verify</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">API Keys</div>
+      <ul class="sidebar-nav">
+        <li><a href="#keys-create">POST /keys</a></li>
+        <li><a href="#keys-list">GET /keys</a></li>
+        <li><a href="#keys-revoke">DELETE /keys/:id</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Usage</div>
+      <ul class="sidebar-nav">
+        <li><a href="#usage-track">POST /usage/track</a></li>
+        <li><a href="#usage-get">GET /usage/:meter</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Admin</div>
+      <ul class="sidebar-nav">
+        <li><a href="#admin-users">GET /admin/users</a></li>
+        <li><a href="#admin-user">GET /admin/users/:id</a></li>
+        <li><a href="#admin-promote">POST /admin/users/:id/promote</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>API Reference</h1>
+    <p class="docs-lead">
+      Corral exposes a REST API mounted in your app. All endpoints are under
+      <code>/api/auth</code> and <code>/api/billing</code> by default (configurable).
+    </p>
+
+    <div class="callout info">
+      <div class="callout-title">Base URL</div>
+      All paths below are relative to your app's base URL.
+      Auth endpoints: <code>/api/auth/*</code>
+      Billing endpoints: <code>/api/billing/*</code>
+    </div>
+
+    <h3>Authentication</h3>
+    <p>
+      Most endpoints require authentication. Pass credentials using:
+    </p>
+    <ul>
+      <li><strong>Session cookie</strong> — Set by Corral after sign-in. Used automatically by browsers.</li>
+      <li><strong>Bearer token</strong> — <code>Authorization: Bearer &lt;token&gt;</code>. Use for API clients, CLI tools, and non-browser requests.</li>
+      <li><strong>API Key</strong> — <code>X-API-Key: &lt;key&gt;</code>. For server-to-server calls. Created via the API keys endpoint.</li>
+    </ul>
+
+    <hr class="divider">
+
+    <!-- ══ AUTH ══════════════════════════════════════ -->
+    <h2>Auth Endpoints</h2>
+
+    <!-- session -->
+    <div class="endpoint" id="auth-session">
+      <div class="endpoint-header">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/auth/session</span>
+        <span class="endpoint-desc">Get current session</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Returns the current user's session, plan, and feature list. No authentication required — returns <code>null</code> user for anonymous requests.</p>
+
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"user"</span>: {
+    <span class="tok-string">"id"</span>: <span class="tok-string">"usr_01HN2X..."</span>,
+    <span class="tok-string">"email"</span>: <span class="tok-string">"alice@horizon.mil"</span>,
+    <span class="tok-string">"name"</span>: <span class="tok-string">"Alice Chen"</span>,
+    <span class="tok-string">"image"</span>: <span class="tok-string">"https://lh3.googleusercontent.com/..."</span>,
+    <span class="tok-string">"role"</span>: <span class="tok-string">"user"</span>,
+    <span class="tok-string">"createdAt"</span>: <span class="tok-string">"2024-01-15T09:23:00Z"</span>
+  },
+  <span class="tok-string">"plan"</span>: {
+    <span class="tok-string">"id"</span>: <span class="tok-string">"pro"</span>,
+    <span class="tok-string">"status"</span>: <span class="tok-string">"active"</span>,
+    <span class="tok-string">"currentPeriodEnd"</span>: <span class="tok-string">"2024-02-15T09:23:00Z"</span>
+  },
+  <span class="tok-string">"features"</span>: [<span class="tok-string">"basic_search"</span>, <span class="tok-string">"export_csv"</span>, <span class="tok-string">"ai_analysis"</span>, <span class="tok-string">"real_time_feed"</span>],
+  <span class="tok-string">"limits"</span>: {
+    <span class="tok-string">"api_calls"</span>: <span class="tok-number">10000</span>,
+    <span class="tok-string">"export_rows"</span>: <span class="tok-number">100000</span>
+  }
+}</code></pre></div>
+
+        <h4>Anonymous response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"user"</span>: <span class="tok-keyword">null</span>, <span class="tok-string">"plan"</span>: { <span class="tok-string">"id"</span>: <span class="tok-string">"anonymous"</span> }, <span class="tok-string">"features"</span>: [], <span class="tok-string">"limits"</span>: {} }</code></pre></div>
+      </div>
+    </div>
+
+    <!-- signup -->
+    <div class="endpoint" id="auth-signup">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/sign-up/email</span>
+        <span class="endpoint-desc">Register with email + password</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"email"</span>: <span class="tok-string">"alice@horizon.mil"</span>,
+  <span class="tok-string">"password"</span>: <span class="tok-string">"hunter2"</span>,
+  <span class="tok-string">"name"</span>: <span class="tok-string">"Alice Chen"</span>
+}</code></pre></div>
+
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"user"</span>: { <span class="tok-string">"id"</span>: <span class="tok-string">"usr_01HN2X..."</span>, <span class="tok-string">"email"</span>: <span class="tok-string">"alice@horizon.mil"</span> }, <span class="tok-string">"token"</span>: <span class="tok-string">"..."</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <!-- signin email -->
+    <div class="endpoint" id="auth-signin-email">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/sign-in/email</span>
+        <span class="endpoint-desc">Sign in with email magic link or password</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Magic link request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"email"</span>: <span class="tok-string">"alice@horizon.mil"</span>, <span class="tok-string">"callbackURL"</span>: <span class="tok-string">"/dashboard"</span> }</code></pre></div>
+
+        <h4>Response — 200 OK (magic link sent)</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"magic_link_sent"</span>, <span class="tok-string">"email"</span>: <span class="tok-string">"alice@horizon.mil"</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <!-- signin social -->
+    <div class="endpoint" id="auth-signin-social">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/sign-in/social</span>
+        <span class="endpoint-desc">Start OAuth flow</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"provider"</span>: <span class="tok-string">"google"</span>, <span class="tok-string">"callbackURL"</span>: <span class="tok-string">"/dashboard"</span> }</code></pre></div>
+
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"url"</span>: <span class="tok-string">"https://accounts.google.com/o/oauth2/auth?..."</span> }</code></pre></div>
+        <p>Redirect the user to <code>url</code> to complete OAuth.</p>
+      </div>
+    </div>
+
+    <!-- signout -->
+    <div class="endpoint" id="auth-signout">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/sign-out</span>
+        <span class="endpoint-desc">Sign out current user</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Clears the session cookie and invalidates the session in the database.</p>
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"signed_out"</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <!-- verify email -->
+    <div class="endpoint" id="auth-verify">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/verify-email</span>
+        <span class="endpoint-desc">Verify magic link token</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"token"</span>: <span class="tok-string">"ml_01HN2X..."</span> }</code></pre></div>
+
+        <h4>Response — 200 OK (sets session cookie)</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"verified"</span>, <span class="tok-string">"user"</span>: { ... }, <span class="tok-string">"token"</span>: <span class="tok-string">"..."</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ══ BILLING ════════════════════════════════════ -->
+    <h2>Billing Endpoints</h2>
+
+    <!-- checkout -->
+    <div class="endpoint" id="billing-checkout">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/billing/checkout</span>
+        <span class="endpoint-desc">Create Stripe Checkout session</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Requires authentication.</p>
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"plan"</span>: <span class="tok-string">"pro"</span>,
+  <span class="tok-string">"successUrl"</span>: <span class="tok-string">"https://horizon.mil/dashboard?upgraded=1"</span>,
+  <span class="tok-string">"cancelUrl"</span>: <span class="tok-string">"https://horizon.mil/pricing"</span>
+}</code></pre></div>
+
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"url"</span>: <span class="tok-string">"https://checkout.stripe.com/c/pay/cs_test_..."</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <!-- portal -->
+    <div class="endpoint" id="billing-portal">
+      <div class="endpoint-header">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/billing/portal</span>
+        <span class="endpoint-desc">Redirect to Stripe Customer Portal</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Requires authentication. Query params: <code>?return_url=/dashboard</code></p>
+        <p>Redirects (302) to the Stripe Customer Portal URL for the authenticated user.</p>
+      </div>
+    </div>
+
+    <!-- cancel -->
+    <div class="endpoint" id="billing-cancel">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/billing/cancel</span>
+        <span class="endpoint-desc">Cancel subscription at period end</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Requires authentication. Cancels at end of current billing period (not immediately).</p>
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"status"</span>: <span class="tok-string">"canceled"</span>,
+  <span class="tok-string">"active_until"</span>: <span class="tok-string">"2024-02-15T09:23:00Z"</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <!-- reactivate -->
+    <div class="endpoint" id="billing-reactivate">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/billing/reactivate</span>
+        <span class="endpoint-desc">Reactivate a canceled subscription</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Only works if the subscription hasn't ended yet (still in grace period).</p>
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"active"</span>, <span class="tok-string">"plan"</span>: <span class="tok-string">"pro"</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <!-- webhook -->
+    <div class="endpoint" id="billing-webhook">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/billing/webhook</span>
+        <span class="endpoint-desc">Stripe webhook endpoint</span>
+      </div>
+      <div class="endpoint-body">
+        <p>
+          Receives Stripe events. Verified using <code>STRIPE_WEBHOOK_SECRET</code>.
+          Do not call this endpoint directly — it's for Stripe only.
+        </p>
+        <p>Register this URL in Stripe Dashboard → Webhooks → Add Endpoint, or use:</p>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+        <pre><code>corral stripe push  <span class="tok-comment"># registers webhook automatically</span></code></pre></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ══ DEVICE AUTH ════════════════════════════════ -->
+    <h2>Device Auth Endpoints</h2>
+    <p>Implements <a href="https://datatracker.ietf.org/doc/html/rfc8628" target="_blank" rel="noopener">RFC 8628</a> Device Authorization Grant.</p>
+
+    <!-- device authorize -->
+    <div class="endpoint" id="device-authorize">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/device/authorize</span>
+        <span class="endpoint-desc">Start device auth flow</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"client_id"</span>: <span class="tok-string">"horizon-cli"</span>, <span class="tok-string">"scope"</span>: <span class="tok-string">"openid profile"</span> }</code></pre></div>
+
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"device_code"</span>: <span class="tok-string">"dc_01HN2X..."</span>,
+  <span class="tok-string">"user_code"</span>: <span class="tok-string">"XKCD-9821"</span>,
+  <span class="tok-string">"verification_uri"</span>: <span class="tok-string">"https://horizon.mil/auth/activate"</span>,
+  <span class="tok-string">"verification_uri_complete"</span>: <span class="tok-string">"https://horizon.mil/auth/activate?code=XKCD-9821"</span>,
+  <span class="tok-string">"expires_in"</span>: <span class="tok-number">300</span>,
+  <span class="tok-string">"interval"</span>: <span class="tok-number">5</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <!-- device token -->
+    <div class="endpoint" id="device-token">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/device/token</span>
+        <span class="endpoint-desc">Poll for device token</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Poll at the interval returned by <code>/device/authorize</code>.</p>
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"grant_type"</span>: <span class="tok-string">"urn:ietf:params:oauth:grant-type:device_code"</span>,
+  <span class="tok-string">"device_code"</span>: <span class="tok-string">"dc_01HN2X..."</span>,
+  <span class="tok-string">"client_id"</span>: <span class="tok-string">"horizon-cli"</span>
+}</code></pre></div>
+
+        <h4>Response — Pending (user hasn't approved yet)</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"error"</span>: <span class="tok-string">"authorization_pending"</span> }   <span class="tok-comment">// keep polling</span></code></pre></div>
+
+        <h4>Response — Approved</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"access_token"</span>: <span class="tok-string">"eyJhbGciOiJIUzI1NiIs..."</span>,
+  <span class="tok-string">"token_type"</span>: <span class="tok-string">"Bearer"</span>,
+  <span class="tok-string">"expires_in"</span>: <span class="tok-number">3600</span>,
+  <span class="tok-string">"refresh_token"</span>: <span class="tok-string">"rt_01HN2X..."</span>,
+  <span class="tok-string">"scope"</span>: <span class="tok-string">"openid profile"</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <!-- device verify -->
+    <div class="endpoint" id="device-verify">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/device/verify</span>
+        <span class="endpoint-desc">User approves device code</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Called from the browser approval page. Requires user to be authenticated.</p>
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"user_code"</span>: <span class="tok-string">"XKCD-9821"</span> }</code></pre></div>
+
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"approved"</span>, <span class="tok-string">"client_id"</span>: <span class="tok-string">"horizon-cli"</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ══ API KEYS ═══════════════════════════════════ -->
+    <h2>API Key Endpoints</h2>
+
+    <div class="endpoint" id="keys-create">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/auth/keys</span>
+        <span class="endpoint-desc">Create API key</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Requires authentication. The key is shown once — store it securely.</p>
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"name"</span>: <span class="tok-string">"horizon-cli production"</span>,
+  <span class="tok-string">"scopes"</span>: [<span class="tok-string">"api:read"</span>, <span class="tok-string">"api:write"</span>],
+  <span class="tok-string">"expiresIn"</span>: <span class="tok-string">"90d"</span>
+}</code></pre></div>
+
+        <h4>Response — 201 Created</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"id"</span>: <span class="tok-string">"key_01HN2X..."</span>,
+  <span class="tok-string">"key"</span>: <span class="tok-string">"ck_live_01HN2X..."</span>,  <span class="tok-comment">// shown once</span>
+  <span class="tok-string">"name"</span>: <span class="tok-string">"horizon-cli production"</span>,
+  <span class="tok-string">"scopes"</span>: [<span class="tok-string">"api:read"</span>, <span class="tok-string">"api:write"</span>],
+  <span class="tok-string">"expiresAt"</span>: <span class="tok-string">"2024-04-15T09:23:00Z"</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="keys-list">
+      <div class="endpoint-header">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/auth/keys</span>
+        <span class="endpoint-desc">List API keys</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Returns all API keys for the authenticated user. Key values are not returned (only metadata).</p>
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"keys"</span>: [
+    { <span class="tok-string">"id"</span>: <span class="tok-string">"key_01HN2X..."</span>, <span class="tok-string">"name"</span>: <span class="tok-string">"horizon-cli production"</span>, <span class="tok-string">"lastUsed"</span>: <span class="tok-string">"2024-01-15"</span> }
+  ]
+}</code></pre></div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="keys-revoke">
+      <div class="endpoint-header">
+        <span class="method delete">DELETE</span>
+        <span class="endpoint-path">/api/auth/keys/:id</span>
+        <span class="endpoint-desc">Revoke API key</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"revoked"</span> }</code></pre></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ══ USAGE ══════════════════════════════════════ -->
+    <h2>Usage Meter Endpoints</h2>
+
+    <div class="endpoint" id="usage-track">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/billing/usage/track</span>
+        <span class="endpoint-desc">Track usage</span>
+      </div>
+      <div class="endpoint-body">
+        <p>Increment a usage meter for the authenticated user.</p>
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"meter"</span>: <span class="tok-string">"api_calls"</span>, <span class="tok-string">"amount"</span>: <span class="tok-number">1</span> }</code></pre></div>
+
+        <h4>Response — 200 OK</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"meter"</span>: <span class="tok-string">"api_calls"</span>,
+  <span class="tok-string">"used"</span>: <span class="tok-number">1247</span>,
+  <span class="tok-string">"limit"</span>: <span class="tok-number">10000</span>,
+  <span class="tok-string">"remaining"</span>: <span class="tok-number">8753</span>,
+  <span class="tok-string">"resetsAt"</span>: <span class="tok-string">"2024-02-01T00:00:00Z"</span>
+}</code></pre></div>
+
+        <h4>Response — 429 (limit exceeded)</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"error"</span>: <span class="tok-string">"meter_exceeded"</span>,
+  <span class="tok-string">"meter"</span>: <span class="tok-string">"api_calls"</span>,
+  <span class="tok-string">"limit"</span>: <span class="tok-number">500</span>,
+  <span class="tok-string">"used"</span>: <span class="tok-number">500</span>,
+  <span class="tok-string">"resetsAt"</span>: <span class="tok-string">"2024-02-01T00:00:00Z"</span>,
+  <span class="tok-string">"upgrade_url"</span>: <span class="tok-string">"/pricing"</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="usage-get">
+      <div class="endpoint-header">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/billing/usage/:meter</span>
+        <span class="endpoint-desc">Get meter usage</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"meter"</span>: <span class="tok-string">"api_calls"</span>,
+  <span class="tok-string">"used"</span>: <span class="tok-number">1247</span>,
+  <span class="tok-string">"limit"</span>: <span class="tok-number">10000</span>,
+  <span class="tok-string">"remaining"</span>: <span class="tok-number">8753</span>,
+  <span class="tok-string">"percent"</span>: <span class="tok-number">12.47</span>,
+  <span class="tok-string">"resetsAt"</span>: <span class="tok-string">"2024-02-01T00:00:00Z"</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ══ ADMIN ══════════════════════════════════════ -->
+    <h2>Admin Endpoints</h2>
+    <p>All admin endpoints require <code>role: admin</code>.</p>
+
+    <div class="endpoint" id="admin-users">
+      <div class="endpoint-header">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/admin/users</span>
+        <span class="endpoint-desc">List users</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Query params</h4>
+        <p><code>?page=1&limit=50&plan=pro&search=alice</code></p>
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{
+  <span class="tok-string">"users"</span>: [ { <span class="tok-string">"id"</span>: <span class="tok-string">"..."</span>, <span class="tok-string">"email"</span>: <span class="tok-string">"..."</span>, <span class="tok-string">"plan"</span>: <span class="tok-string">"pro"</span>, <span class="tok-string">"createdAt"</span>: <span class="tok-string">"..."</span> } ],
+  <span class="tok-string">"total"</span>: <span class="tok-number">1284</span>,
+  <span class="tok-string">"page"</span>: <span class="tok-number">1</span>,
+  <span class="tok-string">"pages"</span>: <span class="tok-number">26</span>
+}</code></pre></div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="admin-promote">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/admin/users/:id/promote</span>
+        <span class="endpoint-desc">Change user role or plan</span>
+      </div>
+      <div class="endpoint-body">
+        <h4>Request</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"role"</span>: <span class="tok-string">"admin"</span> }
+<span class="tok-comment">// or:</span>
+{ <span class="tok-string">"plan"</span>: <span class="tok-string">"enterprise"</span>, <span class="tok-string">"skip_stripe"</span>: <span class="tok-keyword">true</span> }</code></pre></div>
+
+        <h4>Response</h4>
+        <div class="code-block"><div class="code-block-header"><span class="code-lang">json</span></div>
+        <pre><code>{ <span class="tok-string">"status"</span>: <span class="tok-string">"ok"</span>, <span class="tok-string">"user"</span>: { <span class="tok-string">"id"</span>: <span class="tok-string">"..."</span>, <span class="tok-string">"role"</span>: <span class="tok-string">"admin"</span>, <span class="tok-string">"plan"</span>: <span class="tok-string">"pro"</span> } }</code></pre></div>
+      </div>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="agents.html">← Agent Integration</a>
+        <a href="quickstart.html">Back to Quickstart ↑</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

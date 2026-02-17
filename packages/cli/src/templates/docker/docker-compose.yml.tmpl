@@ -1,0 +1,41 @@
+# =============================================================================
+# Corral Docker Compose — Local Development
+# =============================================================================
+# Hot-reload friendly. Mounts source code as volumes so changes are
+# picked up without rebuilding. Auth on :3456 (internal), backend on :8000.
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BACKEND_LANG: {{BACKEND_LANG}}
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - AUTH_PORT=3456
+      - AUTH_URL=http://localhost:3456
+      - PORT=8000
+      - CORRAL_DB_PATH=/app/data/corral.db
+    volumes:
+      # Hot-reload: mount source code
+      - ./server:/app/server
+      - ./{{{BACKEND_SRC}}}:/app/{{BACKEND_SRC}}
+      # Persistent SQLite data
+      - corral_data:/app/data
+      # Avoid overwriting node_modules
+      - /app/server/node_modules
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  corral_data:

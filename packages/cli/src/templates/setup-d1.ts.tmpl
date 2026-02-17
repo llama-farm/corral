@@ -1,0 +1,63 @@
+// {{APP_NAME}} — Corral Auth Setup (Cloudflare D1)
+// For Cloudflare Workers / Pages with D1 binding.
+// D1 is SQLite-based, runs on Cloudflare's edge network.
+//
+// In wrangler.toml:
+//   [[d1_databases]]
+//   binding = "DB"
+//   database_name = "corral-auth"
+//   database_id = "your-database-id"
+//
+// Run migrations with: npx wrangler d1 execute corral-auth --file=./server/corral-tables.sql
+
+import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
+
+// D1 is injected as an env binding in Cloudflare Workers
+// This function creates the auth instance per-request (Workers are stateless)
+export function createAuth(d1: D1Database, env: { BETTER_AUTH_SECRET: string; BETTER_AUTH_URL: string; CORS_ORIGIN?: string }) {
+  const corsOrigin = env.CORS_ORIGIN || "http://localhost:5173";
+
+  return betterAuth({
+    // D1 uses the { db, type } format — it's a special SQLite interface
+    database: {
+      db: d1,
+      type: "sqlite",
+    },
+    baseURL: env.BETTER_AUTH_URL,
+    basePath: "/api/auth",
+    secret: env.BETTER_AUTH_SECRET,
+    emailAndPassword: { enabled: true },
+    plugins: [admin()],
+    session: { expiresIn: 60 * 60 * 24 * 30 },
+    user: {
+      additionalFields: {
+        plan: {
+          type: "string" as const,
+          defaultValue: "free",
+        },
+      },
+    },
+    trustedOrigins: [
+      corsOrigin,
+      corsOrigin.replace("localhost", "127.0.0.1"),
+    ],
+  });
+}
+
+// D1 type declarations (Workers runtime provides these)
+interface D1Database {
+  prepare(query: string): D1PreparedStatement;
+  batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
+  exec(query: string): Promise<D1ExecResult>;
+}
+interface D1PreparedStatement {
+  bind(...values: any[]): D1PreparedStatement;
+  first<T = unknown>(colName?: string): Promise<T>;
+  run<T = unknown>(): Promise<D1Result<T>>;
+  all<T = unknown>(): Promise<D1Result<T>>;
+}
+interface D1Result<T = unknown> { results: T[]; success: boolean; meta: any; }
+interface D1ExecResult { count: number; duration: number; }
+
+export type Session = ReturnType<typeof createAuth>["$Infer"]["Session"];

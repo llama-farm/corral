@@ -1,0 +1,111 @@
+# =============================================================================
+# Corral Auth + {{BACKEND_LANG}} Backend — Single Container
+# =============================================================================
+# The Node.js auth server runs internally on port 3456. Only the backend
+# port (default 8000) is exposed. Your backend talks to auth via
+# AUTH_URL=http://localhost:3456. Nobody outside the container sees Node.
+# =============================================================================
+
+# -- Build arg: python | go | rust | ruby
+ARG BACKEND_LANG={{BACKEND_LANG}}
+
+# =============================================================================
+# Stage 1: Node base (always needed for the Corral auth server)
+# =============================================================================
+FROM node:22-slim AS base
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor curl tini \
+    && rm -rf /var/lib/apt/lists/*
+
+# -- Install backend runtime based on BACKEND_LANG
+ARG BACKEND_LANG
+# {{#if_python}}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+# {{/if_python}}
+# {{#if_go}}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    golang-go \
+    && rm -rf /var/lib/apt/lists/*
+# {{/if_go}}
+# {{#if_rust}}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH="/root/.cargo/bin:${PATH}"
+# {{/if_rust}}
+# {{#if_ruby}}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ruby ruby-dev build-essential \
+    && rm -rf /var/lib/apt/lists/*
+# {{/if_ruby}}
+
+WORKDIR /app
+
+# =============================================================================
+# Stage 2: Install Corral auth server
+# =============================================================================
+COPY server/package*.json server/
+RUN cd server && npm ci --omit=dev
+
+COPY server/ server/
+
+# =============================================================================
+# Stage 3: Install backend
+# =============================================================================
+# {{#if_python}}
+COPY requirements.txt .
+RUN python3 -m venv /app/venv && /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+COPY {{BACKEND_SRC}} {{BACKEND_SRC}}
+# {{/if_python}}
+# {{#if_go}}
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o /app/backend {{GO_MAIN}}
+# {{/if_go}}
+# {{#if_rust}}
+COPY Cargo.toml Cargo.lock ./
+COPY src/ src/
+RUN cargo build --release && cp target/release/{{RUST_BIN}} /app/backend
+# {{/if_rust}}
+# {{#if_ruby}}
+COPY Gemfile Gemfile.lock ./
+RUN bundle install --without development test
+COPY {{BACKEND_SRC}} {{BACKEND_SRC}}
+# {{/if_ruby}}
+
+# =============================================================================
+# Stage 4: Runtime config
+# =============================================================================
+
+# SQLite data directory (mount as a volume for persistence)
+RUN mkdir -p /app/data
+
+# Supervisord config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Non-root user for production safety
+RUN groupadd -r corral && useradd -r -g corral -d /app corral \
+    && chown -R corral:corral /app
+USER corral
+
+# Environment
+ENV AUTH_PORT=3456 \
+    AUTH_URL=http://localhost:3456 \
+    PORT=8000 \
+    CORRAL_DB_PATH=/app/data/corral.db \
+    NODE_ENV=production
+
+# Only expose the backend port — auth stays internal
+EXPOSE 8000
+
+# Tini handles PID 1 signal forwarding
+ENTRYPOINT ["tini", "--"]
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1

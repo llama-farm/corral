@@ -1,0 +1,62 @@
+{
+  "name": "@llamafarm/corral",
+  "version": "0.1.0",
+  "description": "Authentication, billing, and API scaffolding for SaaS apps — batteries included",
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/llama-farm/corral.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://llama-farm.github.io/corral/",
+  "bugs": {
+    "url": "https://github.com/llama-farm/corral/issues"
+  },
+  "keywords": [
+    "auth",
+    "authentication",
+    "billing",
+    "stripe",
+    "better-auth",
+    "saas",
+    "api",
+    "hono",
+    "typescript",
+    "esm"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no lint configured'",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "better-auth": "^1.4.0",
+    "@better-auth/stripe": "^1.4.0",
+    "stripe": "^20.0.0",
+    "hono": "^4.0.0",
+    "yaml": "^2.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0"
+  }
+}

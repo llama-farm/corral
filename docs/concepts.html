@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Core Concepts — Corral Docs</title>
+  <meta name="description" content="Understand how Corral's auth, plans, feature gating, usage meters, and device auth work.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html" class="active">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Getting Started</div>
+      <ul class="sidebar-nav">
+        <li><a href="quickstart.html">Quickstart</a></li>
+        <li><a href="concepts.html" class="active">Core Concepts</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">On This Page</div>
+      <ul class="sidebar-nav">
+        <li><a href="#auth">Auth (Better Auth)</a></li>
+        <li><a href="#plans">Plans &amp; Features</a></li>
+        <li><a href="#meters">Usage Meters</a></li>
+        <li><a href="#device-auth">Device Auth</a></li>
+        <li><a href="#hierarchy">Gating Hierarchy</a></li>
+        <li><a href="#config-file">The Config File</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="cli.html">CLI Reference</a></li>
+        <li><a href="api.html">API Reference</a></li>
+        <li><a href="frameworks.html">Framework Guides</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Features</div>
+      <ul class="sidebar-nav">
+        <li><a href="billing.html">Stripe Billing</a></li>
+        <li><a href="gating.html">Feature Gating</a></li>
+        <li><a href="agents.html">Agent Integration</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>Core Concepts</h1>
+    <p class="docs-lead">
+      Corral is built on a small set of composable primitives.
+      Understand these and the entire system becomes predictable.
+    </p>
+
+    <!-- ── Auth ───────────────────────────────────────── -->
+    <h2 id="auth">Auth — Better Auth under the hood</h2>
+    <p>
+      Corral wraps <a href="https://www.better-auth.com" target="_blank" rel="noopener">Better Auth</a>
+      — a TypeScript-first auth library that handles sessions, OAuth, magic links,
+      passkeys, TOTP, and more. Corral adds billing and gating on top without
+      replacing or forking Better Auth.
+    </p>
+
+    <h3>What Corral handles vs. what Better Auth handles</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Concern</th><th>Handled by</th><th>Configured in</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>OAuth flows (Google, GitHub…)</td><td>Better Auth</td><td><code>corral.yaml</code> → compiled to BA config</td></tr>
+          <tr><td>Session storage + TTL</td><td>Better Auth</td><td><code>auth.session_ttl</code></td></tr>
+          <tr><td>Magic link / OTP email</td><td>Better Auth</td><td><code>auth.providers.email</code></td></tr>
+          <tr><td>Passkeys (WebAuthn)</td><td>Better Auth</td><td><code>auth.providers: [passkey]</code></td></tr>
+          <tr><td>User ↔ plan mapping</td><td>Corral</td><td><code>plans:</code></td></tr>
+          <tr><td>Stripe checkout + webhooks</td><td>Corral</td><td><code>plans.*.price</code></td></tr>
+          <tr><td>Feature gate evaluation</td><td>Corral</td><td><code>features:</code></td></tr>
+          <tr><td>Usage meter tracking</td><td>Corral</td><td><code>meters:</code></td></tr>
+          <tr><td>Device auth (CLI OAuth)</td><td>Corral</td><td><code>auth.providers: [device]</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Session model</h3>
+    <p>
+      Every signed-in request carries a session cookie (or Bearer token for API calls).
+      The session contains a <strong>user ID</strong> only — plan and feature data are
+      fetched from the database on each request and cached per-session in memory
+      (configurable TTL, default 60s).
+    </p>
+    <p>
+      The session object your code receives:
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">interface</span> CorralSession {
+  user: {
+    id: <span class="tok-keyword">string</span>
+    email: <span class="tok-keyword">string</span>
+    name?: <span class="tok-keyword">string</span>
+    image?: <span class="tok-keyword">string</span>
+    role: <span class="tok-string">'user'</span> | <span class="tok-string">'admin'</span>
+    createdAt: <span class="tok-keyword">Date</span>
+  }
+  plan: {
+    id: <span class="tok-string">'free'</span> | <span class="tok-string">'pro'</span> | <span class="tok-string">'enterprise'</span>    <span class="tok-comment">// matches corral.yaml</span>
+    status: <span class="tok-string">'active'</span> | <span class="tok-string">'trialing'</span> | <span class="tok-string">'past_due'</span> | <span class="tok-string">'canceled'</span>
+    trialEndsAt?: <span class="tok-keyword">Date</span>
+    currentPeriodEnd?: <span class="tok-keyword">Date</span>
+  }
+  features: <span class="tok-keyword">string</span>[]   <span class="tok-comment">// ['basic_search', 'export_csv', 'ai_analysis', ...]</span>
+  limits: Record&lt;<span class="tok-keyword">string</span>, <span class="tok-keyword">number</span>&gt;  <span class="tok-comment">// meter limits for this plan</span>
+}</code></pre>
+    </div>
+
+    <div class="callout info">
+      <div class="callout-title">Anonymous sessions</div>
+      Unauthenticated requests still get a session object, but with
+      <code>user: null</code>, <code>plan: { id: 'anonymous' }</code>,
+      and an empty <code>features</code> array. This lets you gate features
+      for anonymous vs. logged-in users consistently.
+    </div>
+
+    <!-- ── Plans & Features ───────────────────────────── -->
+    <h2 id="plans">Plans &amp; Features</h2>
+    <p>
+      Plans are the subscription tiers of your product. Features are
+      named capabilities that belong to one or more plans.
+      The mapping lives entirely in <code>corral.yaml</code>.
+    </p>
+
+    <h3>Plan hierarchy</h3>
+    <p>
+      Plans are ordered in <code>corral.yaml</code>. Higher plans inherit all
+      features of lower plans unless you opt out:
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">plans</span>:
+  <span class="tok-key">free</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">0</span>
+  <span class="tok-key">pro</span>:
+    <span class="tok-key">price</span>: <span class="tok-number">49</span>
+    <span class="tok-key">inherits</span>: <span class="tok-string">free</span>   <span class="tok-comment"># optional; default is true for ordered plans</span>
+  <span class="tok-key">enterprise</span>:
+    <span class="tok-key">price</span>: <span class="tok-keyword">custom</span>
+    <span class="tok-key">inherits</span>: <span class="tok-string">pro</span>
+
+<span class="tok-key">features</span>:
+  <span class="tok-key">basic_search</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">free</span>, <span class="tok-string">pro</span>, <span class="tok-string">enterprise</span>]
+  <span class="tok-key">ai_analysis</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">pro</span>, <span class="tok-string">enterprise</span>]
+    <span class="tok-key">gate</span>: <span class="tok-string">blur</span>
+  <span class="tok-key">bulk_export</span>:
+    <span class="tok-key">plans</span>: [<span class="tok-string">enterprise</span>]
+    <span class="tok-key">gate</span>: <span class="tok-string">block</span></code></pre>
+    </div>
+
+    <h3>Gate modes</h3>
+    <p>
+      When a user without access encounters a gated feature, Corral can respond
+      in several ways, controlled by <code>gate:</code>:
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Mode</th><th>What the user sees</th><th>Best for</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>hide</code></td><td>Feature completely absent from UI</td><td>Admin-only features</td></tr>
+          <tr><td><code>blur</code></td><td>Content blurred with upgrade CTA overlay</td><td>Premium content preview</td></tr>
+          <tr><td><code>skeleton</code></td><td>Loading skeleton with "upgrade to unlock" hint</td><td>Real-time data, charts</td></tr>
+          <tr><td><code>block</code></td><td>Hard block: full-width upgrade prompt</td><td>High-value gated pages</td></tr>
+          <tr><td><code>redirect</code></td><td>Redirect to <code>gate.redirect_to</code> URL</td><td>Server-side pages</td></tr>
+          <tr><td><code>disabled</code></td><td>Button/control visible but disabled with tooltip</td><td>Actions in forms</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Usage Meters ───────────────────────────────── -->
+    <h2 id="meters">Usage Meters</h2>
+    <p>
+      Meters track consumption of a resource (API calls, exported rows, AI tokens,
+      storage bytes) and enforce per-plan limits. They're defined in
+      <code>corral.yaml</code> and stored in your database.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">meters</span>:
+  <span class="tok-key">api_calls</span>:
+    <span class="tok-key">plans</span>:
+      <span class="tok-key">free</span>: <span class="tok-number">500</span>
+      <span class="tok-key">pro</span>: <span class="tok-number">10000</span>
+      <span class="tok-key">enterprise</span>: <span class="tok-keyword">unlimited</span>
+    <span class="tok-key">window</span>: <span class="tok-string">month</span>      <span class="tok-comment"># rolling 30 days, or calendar month</span>
+    <span class="tok-key">overage</span>: <span class="tok-string">block</span>    <span class="tok-comment"># block | warn | charge</span>
+  <span class="tok-key">export_rows</span>:
+    <span class="tok-key">plans</span>:
+      <span class="tok-key">free</span>: <span class="tok-number">1000</span>
+      <span class="tok-key">pro</span>: <span class="tok-number">100000</span>
+    <span class="tok-key">window</span>: <span class="tok-string">month</span>
+    <span class="tok-key">overage</span>: <span class="tok-string">warn</span>     <span class="tok-comment"># show warning but allow</span></code></pre>
+    </div>
+
+    <h3>Tracking usage</h3>
+    <p>
+      Call the <code>trackUsage</code> function on the server side wherever a
+      metered action occurs:
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">import</span> { trackUsage, checkLimit } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/core'</span>
+
+<span class="tok-comment">// In a server action or API route:</span>
+<span class="tok-keyword">async function</span> <span class="tok-cmd">runAIAnalysis</span>(userId: <span class="tok-keyword">string</span>, payload: AnalysisRequest) {
+  <span class="tok-comment">// Check before running</span>
+  <span class="tok-keyword">const</span> allowed = <span class="tok-keyword">await</span> <span class="tok-cmd">checkLimit</span>(userId, <span class="tok-string">'api_calls'</span>)
+  <span class="tok-keyword">if</span> (!allowed.ok) {
+    <span class="tok-keyword">throw new</span> Error(<span class="tok-string">`API limit reached. Resets ${allowed.resetsAt}.`</span>)
+  }
+
+  <span class="tok-comment">// Do the work</span>
+  <span class="tok-keyword">const</span> result = <span class="tok-keyword">await</span> <span class="tok-cmd">doAnalysis</span>(payload)
+
+  <span class="tok-comment">// Record usage</span>
+  <span class="tok-keyword">await</span> <span class="tok-cmd">trackUsage</span>(userId, <span class="tok-string">'api_calls'</span>, <span class="tok-number">1</span>)
+
+  <span class="tok-keyword">return</span> result
+}</code></pre>
+    </div>
+
+    <h3>Overage behaviors</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Overage</th><th>Behavior</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>block</code></td><td><code>checkLimit()</code> returns <code>{ ok: false }</code>. You must handle the block.</td></tr>
+          <tr><td><code>warn</code></td><td><code>checkLimit()</code> returns <code>{ ok: true, warning: true, percent: 105 }</code>.</td></tr>
+          <tr><td><code>charge</code></td><td>Overage billed via Stripe metered billing. Requires Stripe setup.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Device Auth ───────────────────────────────── -->
+    <h2 id="device-auth">Device Auth (CLI → Browser → Token)</h2>
+    <p>
+      Device auth lets a CLI tool or non-browser environment authenticate
+      a user via their browser. It follows the
+      <a href="https://datatracker.ietf.org/doc/html/rfc8628" target="_blank" rel="noopener">OAuth 2.0 Device Authorization Grant (RFC 8628)</a>.
+    </p>
+    <p>
+      HORIZON ships with a CLI tool (<code>horizon-cli</code>) that analysts
+      use to query the API from their terminal. Device auth lets them
+      log in to the web app once and have the CLI automatically receive a token.
+    </p>
+
+    <h3>The flow</h3>
+    <ol>
+      <li>CLI calls <code>POST /api/auth/device/authorize</code> → gets a <code>device_code</code> and a <code>user_code</code></li>
+      <li>CLI prints: <em>"Open https://horizon.mil/auth/activate and enter code: ABCD-1234"</em></li>
+      <li>User opens browser, logs in (if not already), enters the code</li>
+      <li>CLI polls <code>POST /api/auth/device/token</code> until approved</li>
+      <li>CLI receives an access token + refresh token</li>
+      <li>All subsequent CLI requests include <code>Authorization: Bearer &lt;token&gt;</code></li>
+    </ol>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">typescript</span><span class="code-filename">horizon-cli/auth.ts</span></div>
+      <pre><code><span class="tok-keyword">import</span> { deviceAuth } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/client'</span>
+
+<span class="tok-keyword">const</span> auth = <span class="tok-keyword">new</span> <span class="tok-cmd">deviceAuth</span>({ baseUrl: <span class="tok-string">'https://horizon.mil'</span> })
+
+<span class="tok-comment">// Start the flow</span>
+<span class="tok-keyword">const</span> { userCode, verificationUri } = <span class="tok-keyword">await</span> auth.<span class="tok-cmd">start</span>()
+console.<span class="tok-cmd">log</span>(<span class="tok-string">`Open ${verificationUri} and enter: ${userCode}`</span>)
+
+<span class="tok-comment">// Poll until approved (or expired)</span>
+<span class="tok-keyword">const</span> token = <span class="tok-keyword">await</span> auth.<span class="tok-cmd">poll</span>()   <span class="tok-comment">// blocks until user approves</span>
+console.<span class="tok-cmd">log</span>(<span class="tok-string">'Authenticated!'</span>)
+
+<span class="tok-comment">// Use the token</span>
+<span class="tok-keyword">const</span> response = <span class="tok-keyword">await</span> <span class="tok-cmd">fetch</span>(<span class="tok-string">'https://horizon.mil/api/intel'</span>, {
+  headers: { Authorization: <span class="tok-string">`Bearer ${token.access_token}`</span> }
+})</code></pre>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-title">Enable device auth</div>
+      Add <code>device</code> to your auth providers in <code>corral.yaml</code>,
+      then run <code>corral add device-verify --page /auth/activate</code> to
+      generate the approval page.
+    </div>
+
+    <!-- ── Gating Hierarchy ──────────────────────────── -->
+    <h2 id="hierarchy">The Gating Hierarchy</h2>
+    <p>
+      Corral's gate evaluator checks access in a strict order.
+      The first failing check determines the gate response.
+    </p>
+
+    <div class="hierarchy">
+      <div class="hierarchy-level">
+        <div class="hierarchy-badge"><span class="badge badge-gray">Anonymous</span></div>
+        <div>
+          <div class="hierarchy-label">Not signed in</div>
+          <div class="hierarchy-desc">No session. Features gated to <code>auth</code> or above require sign-in. Gate mode = <code>redirect /login</code> by default.</div>
+        </div>
+      </div>
+      <div class="hierarchy-level">
+        <div class="hierarchy-badge"><span class="badge badge-gold">Free</span></div>
+        <div>
+          <div class="hierarchy-label">Signed in, free plan</div>
+          <div class="hierarchy-desc">Has a session. Access to features in the <code>free</code> plan. Gate mode from YAML for blocked features.</div>
+        </div>
+      </div>
+      <div class="hierarchy-level">
+        <div class="hierarchy-badge"><span class="badge badge-green">Pro</span></div>
+        <div>
+          <div class="hierarchy-label">Signed in, paid plan</div>
+          <div class="hierarchy-desc">Active Stripe subscription. Access to all features in <code>pro</code> (and inherited <code>free</code>). Meter limits apply.</div>
+        </div>
+      </div>
+      <div class="hierarchy-level">
+        <div class="hierarchy-badge" style="width:80px;text-align:center"><span class="badge" style="background:rgba(59,130,246,0.2);color:#93c5fd">Admin</span></div>
+        <div>
+          <div class="hierarchy-label">Admin role</div>
+          <div class="hierarchy-desc">Role-based, not plan-based. Can access <code>roles: [admin]</code> features regardless of plan. Set via <code>corral promote &lt;email&gt; admin</code>.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Evaluation order</h3>
+    <ol>
+      <li><strong>Authentication check</strong> — Is there a valid session?</li>
+      <li><strong>Role check</strong> — Does the feature require a role? Does the user have it?</li>
+      <li><strong>Plan check</strong> — Is the user's plan in the feature's <code>plans</code> list?</li>
+      <li><strong>Subscription status check</strong> — Is the subscription active/trialing (not canceled/past_due)?</li>
+      <li><strong>Meter check</strong> — Has the user exceeded their usage limit for this meter?</li>
+      <li><strong>Granted</strong> — All checks pass; feature is accessible.</li>
+    </ol>
+
+    <!-- ── Config File ───────────────────────────────── -->
+    <h2 id="config-file">The Config File</h2>
+    <p>
+      <code>corral.yaml</code> is the single source of truth. It's checked into version
+      control and treated as infrastructure-as-code. Changing the file and restarting
+      the app automatically applies the changes. <code>corral validate</code> checks
+      for inconsistencies before deploy.
+    </p>
+
+    <h3>Top-level sections</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Section</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>app</code></td><td>Name, URL, description</td></tr>
+          <tr><td><code>auth</code></td><td>Providers, session TTL, 2FA settings</td></tr>
+          <tr><td><code>plans</code></td><td>Plan names, prices, trial days</td></tr>
+          <tr><td><code>features</code></td><td>Feature names, plan membership, gate modes</td></tr>
+          <tr><td><code>meters</code></td><td>Usage counters, per-plan limits, overage behavior</td></tr>
+          <tr><td><code>database</code></td><td>Adapter, connection URL</td></tr>
+          <tr><td><code>admin</code></td><td>Admin page path, access roles</td></tr>
+          <tr><td><code>webhooks</code></td><td>Stripe webhook events to handle</td></tr>
+          <tr><td><code>emails</code></td><td>Email templates and SMTP config</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      All values can reference environment variables with <code>env:VAR_NAME</code> syntax.
+      This keeps secrets out of the YAML file while keeping the structure readable.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">corral.yaml</span><span class="code-lang">yaml</span></div>
+      <pre><code><span class="tok-key">database</span>:
+  <span class="tok-key">adapter</span>: <span class="tok-string">postgres</span>
+  <span class="tok-key">url</span>: <span class="tok-string">env:DATABASE_URL</span>     <span class="tok-comment"># reads process.env.DATABASE_URL</span>
+
+<span class="tok-key">auth</span>:
+  <span class="tok-key">providers</span>:
+    - <span class="tok-key">google</span>:
+        <span class="tok-key">client_id</span>: <span class="tok-string">env:GOOGLE_CLIENT_ID</span>
+        <span class="tok-key">client_secret</span>: <span class="tok-string">env:GOOGLE_CLIENT_SECRET</span></code></pre>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="quickstart.html">← Quickstart</a>
+        <a href="cli.html">CLI Reference →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

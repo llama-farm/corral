@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature Gating — Corral Docs</title>
+  <meta name="description" content="All 15 gating patterns: FeatureGate, PlanGate, AuthGate, PageGate, useFeatureGate, server-side checks.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html" class="active">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Components</div>
+      <ul class="sidebar-nav">
+        <li><a href="#feature-gate">FeatureGate</a></li>
+        <li><a href="#plan-gate">PlanGate</a></li>
+        <li><a href="#auth-gate">AuthGate</a></li>
+        <li><a href="#page-gate">PageGate</a></li>
+        <li><a href="#use-feature-gate">useFeatureGate</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Server-Side</div>
+      <ul class="sidebar-nav">
+        <li><a href="#server-gating">Server Gating</a></li>
+        <li><a href="#api-gating">API Route Gating</a></li>
+        <li><a href="#middleware-gating">Middleware Gating</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Patterns</div>
+      <ul class="sidebar-nav">
+        <li><a href="#patterns">All 15 Patterns</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>Feature Gating</h1>
+    <p class="docs-lead">
+      Corral provides a full set of gating primitives for UI components,
+      pages, API routes, and server functions. All gates read from the same
+      session — no extra API calls needed.
+    </p>
+
+    <div class="callout info">
+      <div class="callout-title">Gate modes are set in corral.yaml</div>
+      The visual behavior (blur, skeleton, block, hide) is configured per-feature
+      in your YAML. Components respect this automatically — you don't pass the
+      mode as a prop. This lets you change gate behavior without touching React code.
+    </div>
+
+    <!-- ── FeatureGate ─────────────────────────────── -->
+    <h2 id="feature-gate">FeatureGate</h2>
+    <p>
+      The primary gating component. Wraps content and shows or hides it
+      based on whether the current user has access to a named feature.
+    </p>
+
+    <h3>Basic usage</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-keyword">import</span> { FeatureGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>  <span class="tok-comment">// or @corral/react</span>
+
+<span class="tok-comment">// Gate mode comes from corral.yaml (ai_analysis has gate: blur)</span>
+&lt;<span class="tok-cmd">FeatureGate</span> feature=<span class="tok-string">"ai_analysis"</span>&gt;
+  &lt;<span class="tok-cmd">AIAnalysisPanel</span> /&gt;
+&lt;/FeatureGate&gt;</code></pre>
+    </div>
+
+    <h3>Override gate mode inline</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-comment">// Override the YAML gate mode for this instance</span>
+&lt;<span class="tok-cmd">FeatureGate</span> feature=<span class="tok-string">"ai_analysis"</span> gate=<span class="tok-string">"block"</span>&gt;
+  &lt;<span class="tok-cmd">AIAnalysisPanel</span> /&gt;
+&lt;/FeatureGate&gt;
+
+<span class="tok-comment">// Custom fallback instead of the auto-generated upgrade prompt</span>
+&lt;<span class="tok-cmd">FeatureGate</span>
+  feature=<span class="tok-string">"ai_analysis"</span>
+  fallback={&lt;<span class="tok-cmd">UpgradeCard</span> feature=<span class="tok-string">"ai_analysis"</span> /&gt;}
+&gt;
+  &lt;<span class="tok-cmd">AIAnalysisPanel</span> /&gt;
+&lt;/FeatureGate&gt;</code></pre>
+    </div>
+
+    <h3>Props</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Prop</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>feature</code></td><td><code>string</code></td><td>Feature name from <code>corral.yaml</code></td></tr>
+          <tr><td><code>gate</code></td><td><code>'blur'|'skeleton'|'block'|'hide'|'disabled'</code></td><td>Override YAML gate mode</td></tr>
+          <tr><td><code>fallback</code></td><td><code>ReactNode</code></td><td>Custom content to show when gated</td></tr>
+          <tr><td><code>session</code></td><td><code>CorralSession</code></td><td>Pass session explicitly (Server Components)</td></tr>
+          <tr><td><code>upgradeUrl</code></td><td><code>string</code></td><td>Override the upgrade CTA URL</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── PlanGate ─────────────────────────────────── -->
+    <h2 id="plan-gate">PlanGate</h2>
+    <p>
+      Gate by plan level rather than by feature name.
+      Useful for generic upgrade prompts or plan-specific UI elements.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-keyword">import</span> { PlanGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+
+<span class="tok-comment">// Show for pro and above</span>
+&lt;<span class="tok-cmd">PlanGate</span> plan=<span class="tok-string">"pro"</span>&gt;
+  &lt;<span class="tok-cmd">RealtimeFeed</span> /&gt;
+&lt;/PlanGate&gt;
+
+<span class="tok-comment">// Show ONLY for free users (inverse gate)</span>
+&lt;<span class="tok-cmd">PlanGate</span> plan=<span class="tok-string">"free"</span> exact&gt;
+  &lt;<span class="tok-cmd">FreeTrialBanner</span> /&gt;
+&lt;/PlanGate&gt;
+
+<span class="tok-comment">// Show for enterprise only</span>
+&lt;<span class="tok-cmd">PlanGate</span> plan=<span class="tok-string">"enterprise"</span> exact fallback={&lt;<span class="tok-cmd">ContactSalesCard</span> /&gt;}&gt;
+  &lt;<span class="tok-cmd">AirGapConfig</span> /&gt;
+&lt;/PlanGate&gt;</code></pre>
+    </div>
+
+    <!-- ── AuthGate ─────────────────────────────────── -->
+    <h2 id="auth-gate">AuthGate</h2>
+    <p>
+      Show content only to authenticated (or unauthenticated) users.
+      The simplest gate — no plan or feature check involved.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-keyword">import</span> { AuthGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+
+<span class="tok-comment">// Only for signed-in users</span>
+&lt;<span class="tok-cmd">AuthGate</span> fallback={&lt;<span class="tok-cmd">SignInButton</span> /&gt;}&gt;
+  &lt;<span class="tok-cmd">UserMenu</span> /&gt;
+&lt;/AuthGate&gt;
+
+<span class="tok-comment">// Only for signed-OUT users (show login prompt)</span>
+&lt;<span class="tok-cmd">AuthGate</span> require=<span class="tok-string">"unauthenticated"</span>&gt;
+  &lt;<span class="tok-cmd">HeroCTA</span> /&gt;
+&lt;/AuthGate&gt;
+
+<span class="tok-comment">// Role check</span>
+&lt;<span class="tok-cmd">AuthGate</span> role=<span class="tok-string">"admin"</span>&gt;
+  &lt;<span class="tok-cmd">AdminToolbar</span> /&gt;
+&lt;/AuthGate&gt;</code></pre>
+    </div>
+
+    <!-- ── PageGate ─────────────────────────────────── -->
+    <h2 id="page-gate">PageGate</h2>
+    <p>
+      Wraps an entire page. On the server, checks session and either renders
+      the page or returns a gate response (redirect, blurred preview, or block).
+      Use this in Next.js layouts or page components.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">src/app/reports/advanced/page.tsx</span><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-keyword">import</span> { PageGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+
+<span class="tok-keyword">export default async function</span> <span class="tok-cmd">AdvancedReportsPage</span>() {
+  <span class="tok-keyword">return</span> (
+    &lt;<span class="tok-cmd">PageGate</span>
+      feature=<span class="tok-string">"ai_analysis"</span>
+      gate=<span class="tok-string">"blur"</span>
+      upgradeUrl=<span class="tok-string">"/pricing"</span>
+      previewLines={<span class="tok-number">8</span>}  <span class="tok-comment">// show first 8 lines blurred</span>
+    &gt;
+      &lt;<span class="tok-cmd">AdvancedReportsContent</span> /&gt;
+    &lt;/PageGate&gt;
+  )
+}</code></pre>
+    </div>
+
+    <h3>PageGate gate modes in detail</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Mode</th><th>Server behavior</th><th>Client behavior</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>redirect</code></td>
+            <td>Server-side redirect to <code>/login</code> or custom URL</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td><code>block</code></td>
+            <td>Renders a full-page upgrade prompt instead of content</td>
+            <td>CSS-only blur overlay with upgrade CTA</td>
+          </tr>
+          <tr>
+            <td><code>blur</code></td>
+            <td>Renders page with partial content, rest blurred</td>
+            <td>CSS blur filter + overlay on blurred section</td>
+          </tr>
+          <tr>
+            <td><code>skeleton</code></td>
+            <td>Renders page shell with skeleton loaders</td>
+            <td>Animated skeleton with "upgrade to see data" hint</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── useFeatureGate ──────────────────────────── -->
+    <h2 id="use-feature-gate">useFeatureGate</h2>
+    <p>
+      React hook for client-side conditional logic. Returns the gate state
+      for a feature based on the current session.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-keyword">import</span> { useFeatureGate } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/react'</span>
+
+<span class="tok-keyword">function</span> <span class="tok-cmd">ExportButton</span>() {
+  <span class="tok-keyword">const</span> { allowed, loading, plan } = <span class="tok-cmd">useFeatureGate</span>(<span class="tok-string">'bulk_export'</span>)
+
+  <span class="tok-keyword">if</span> (loading) <span class="tok-keyword">return</span> &lt;<span class="tok-cmd">Skeleton</span> width=<span class="tok-number">120</span> /&gt;
+
+  <span class="tok-keyword">if</span> (!allowed) {
+    <span class="tok-keyword">return</span> (
+      &lt;button disabled title=<span class="tok-string">{`Upgrade to Enterprise to export bulk data`</span>&gt;
+        Export All <span class="tok-cmd">🔒</span>
+      &lt;/button&gt;
+    )
+  }
+
+  <span class="tok-keyword">return</span> &lt;button onClick={<span class="tok-cmd">handleBulkExport</span>}&gt;Export All&lt;/button&gt;
+}
+
+<span class="tok-comment">// useSession for full session object</span>
+<span class="tok-keyword">import</span> { useSession } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/react'</span>
+
+<span class="tok-keyword">function</span> <span class="tok-cmd">PlanBadge</span>() {
+  <span class="tok-keyword">const</span> { session } = <span class="tok-cmd">useSession</span>()
+  <span class="tok-keyword">return</span> &lt;span&gt;Plan: {session?.plan.id ?? <span class="tok-string">'anonymous'</span>}&lt;/span&gt;
+}</code></pre>
+    </div>
+
+    <h3>Return value</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>allowed</code></td><td><code>boolean</code></td><td>Whether the current user can access this feature</td></tr>
+          <tr><td><code>loading</code></td><td><code>boolean</code></td><td>Session still loading</td></tr>
+          <tr><td><code>reason</code></td><td><code>'unauthenticated'|'wrong_plan'|'meter_exceeded'|'ok'</code></td><td>Why access was denied</td></tr>
+          <tr><td><code>plan</code></td><td><code>string</code></td><td>The minimum plan required</td></tr>
+          <tr><td><code>upgradeUrl</code></td><td><code>string</code></td><td>Generated upgrade URL for this feature</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Server-Side Gating ─────────────────────── -->
+    <h2 id="server-gating">Server-Side Gating</h2>
+    <p>
+      Use <code>requireFeature()</code> or <code>hasFeature()</code> in server
+      components, server actions, and API route handlers.
+    </p>
+
+    <h3>requireFeature — throws on failure</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">import</span> { requireFeature, getSession } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+
+<span class="tok-comment">// In a server action:</span>
+<span class="tok-string">'use server'</span>
+<span class="tok-keyword">export async function</span> <span class="tok-cmd">runAnalysis</span>(input: AnalysisInput) {
+  <span class="tok-keyword">await</span> <span class="tok-cmd">requireFeature</span>(<span class="tok-string">'ai_analysis'</span>)
+  <span class="tok-comment">// throws CorralGateError if not allowed</span>
+  <span class="tok-comment">// the error is caught by Next.js error boundaries</span>
+  <span class="tok-keyword">return</span> <span class="tok-cmd">doAnalysis</span>(input)
+}</code></pre>
+    </div>
+
+    <h3>hasFeature — check without throwing</h3>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">import</span> { getSession } <span class="tok-keyword">from</span> <span class="tok-string">'@/lib/corral'</span>
+
+<span class="tok-keyword">export async function</span> <span class="tok-cmd">GET</span>(req: Request) {
+  <span class="tok-keyword">const</span> session = <span class="tok-keyword">await</span> <span class="tok-cmd">getSession</span>()
+
+  <span class="tok-keyword">if</span> (!session) {
+    <span class="tok-keyword">return</span> Response.<span class="tok-cmd">json</span>({ error: <span class="tok-string">'unauthenticated'</span> }, { status: <span class="tok-number">401</span> })
+  }
+
+  <span class="tok-keyword">const</span> canUseAI = session.features.<span class="tok-cmd">includes</span>(<span class="tok-string">'ai_analysis'</span>)
+  <span class="tok-comment">// or: corral.hasFeature(session, 'ai_analysis')</span>
+
+  <span class="tok-keyword">return</span> Response.<span class="tok-cmd">json</span>({
+    data: canUseAI ? <span class="tok-keyword">await</span> <span class="tok-cmd">getFullData</span>() : <span class="tok-keyword">await</span> <span class="tok-cmd">getBasicData</span>(),
+    upgraded: canUseAI,
+  })
+}</code></pre>
+    </div>
+
+    <!-- ── API Route Gating ───────────────────────── -->
+    <h2 id="api-gating">API Route Gating</h2>
+    <p>
+      Use the <code>withFeature</code> wrapper for clean API route gating.
+      Returns 403 with a structured error if the user doesn't have access.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">src/app/api/analysis/route.ts</span><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">import</span> { withFeature } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+
+<span class="tok-keyword">export const</span> POST = <span class="tok-cmd">withFeature</span>(<span class="tok-string">'ai_analysis'</span>, <span class="tok-keyword">async</span> (req, { session }) => {
+  <span class="tok-comment">// Only reached if user has ai_analysis feature</span>
+  <span class="tok-keyword">const</span> body = <span class="tok-keyword">await</span> req.<span class="tok-cmd">json</span>()
+
+  <span class="tok-comment">// Track usage meter</span>
+  <span class="tok-keyword">await</span> <span class="tok-cmd">trackUsage</span>(session.user.id, <span class="tok-string">'api_calls'</span>, <span class="tok-number">1</span>)
+
+  <span class="tok-keyword">const</span> result = <span class="tok-keyword">await</span> <span class="tok-cmd">runAIAnalysis</span>(body)
+  <span class="tok-keyword">return</span> Response.<span class="tok-cmd">json</span>(result)
+})
+
+<span class="tok-comment">// Error response when gated:</span>
+<span class="tok-comment">// { "error": "feature_not_available",</span>
+<span class="tok-comment">//   "feature": "ai_analysis",</span>
+<span class="tok-comment">//   "required_plan": "pro",</span>
+<span class="tok-comment">//   "upgrade_url": "/pricing" }</span></code></pre>
+    </div>
+
+    <!-- ── Middleware Gating ──────────────────────── -->
+    <h2 id="middleware-gating">Middleware Gating</h2>
+    <p>
+      Gate entire route groups in Next.js middleware without any React involved.
+      Runs at the edge before the page loads.
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-filename">middleware.ts</span><span class="code-lang">typescript</span></div>
+      <pre><code><span class="tok-keyword">import</span> { corralMiddleware } <span class="tok-keyword">from</span> <span class="tok-string">'@corral/next'</span>
+
+<span class="tok-keyword">export function</span> <span class="tok-cmd">middleware</span>(req) {
+  <span class="tok-keyword">return</span> <span class="tok-cmd">corralMiddleware</span>(req, {
+    <span class="tok-comment">// Must be authenticated</span>
+    protectedRoutes: [<span class="tok-string">'/dashboard/:path*'</span>],
+
+    <span class="tok-comment">// Must have specific plan</span>
+    planRoutes: {
+      <span class="tok-string">'/reports/advanced/:path*'</span>: <span class="tok-string">'pro'</span>,
+    },
+
+    <span class="tok-comment">// Must have specific feature</span>
+    featureRoutes: {
+      <span class="tok-string">'/api/analysis/:path*'</span>: <span class="tok-string">'ai_analysis'</span>,
+    },
+
+    <span class="tok-comment">// Must have role</span>
+    roleRoutes: {
+      <span class="tok-string">'/admin/:path*'</span>: <span class="tok-string">'admin'</span>,
+    },
+
+    loginUrl: <span class="tok-string">'/login'</span>,
+    upgradeUrl: <span class="tok-string">'/pricing'</span>,
+  })
+}</code></pre>
+    </div>
+
+    <!-- ── All 15 Patterns ───────────────────────── -->
+    <h2 id="patterns">All 15 Gating Patterns</h2>
+    <p>Every combination of subject, scope, and behavior you'll need:</p>
+
+    <div class="pattern-grid">
+      <div class="pattern-card">
+        <div class="pattern-num">01</div>
+        <div class="pattern-name">Auth redirect</div>
+        <div class="pattern-desc">Redirect unauthenticated users to login. Server-side via middleware.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">02</div>
+        <div class="pattern-name">Auth block</div>
+        <div class="pattern-desc">Show login prompt inline instead of content. <code>&lt;AuthGate&gt;</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">03</div>
+        <div class="pattern-name">Feature hide</div>
+        <div class="pattern-desc">Completely remove a UI element for users without the feature.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">04</div>
+        <div class="pattern-name">Feature blur</div>
+        <div class="pattern-desc">Show blurred preview with upgrade CTA. Best for premium content.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">05</div>
+        <div class="pattern-name">Feature skeleton</div>
+        <div class="pattern-desc">Show loading skeleton. Best for charts and real-time data.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">06</div>
+        <div class="pattern-name">Feature block</div>
+        <div class="pattern-desc">Full-width upgrade prompt. High-friction, high-conversion.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">07</div>
+        <div class="pattern-name">Feature disabled</div>
+        <div class="pattern-desc">Button/control visible but disabled with tooltip. <code>gate: disabled</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">08</div>
+        <div class="pattern-name">Plan gate (min)</div>
+        <div class="pattern-desc">Show content only at or above a certain plan level. <code>&lt;PlanGate plan="pro"&gt;</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">09</div>
+        <div class="pattern-name">Plan gate (exact)</div>
+        <div class="pattern-desc">Show content only for a specific plan. <code>&lt;PlanGate plan="free" exact&gt;</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">10</div>
+        <div class="pattern-name">Role gate</div>
+        <div class="pattern-desc">Show content only to users with a specific role. <code>&lt;AuthGate role="admin"&gt;</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">11</div>
+        <div class="pattern-name">Page gate (server)</div>
+        <div class="pattern-desc">Block entire page server-side. Zero layout shift. <code>&lt;PageGate&gt;</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">12</div>
+        <div class="pattern-name">API route gate</div>
+        <div class="pattern-desc">Return 403 from API routes. <code>withFeature('x', handler)</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">13</div>
+        <div class="pattern-name">Meter gate</div>
+        <div class="pattern-desc">Block action when usage limit exceeded. <code>checkLimit(userId, 'meter')</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">14</div>
+        <div class="pattern-name">Trial gate</div>
+        <div class="pattern-desc">Show content only during trial period. <code>session.plan.status === 'trialing'</code></div>
+      </div>
+      <div class="pattern-card">
+        <div class="pattern-num">15</div>
+        <div class="pattern-name">Conditional render</div>
+        <div class="pattern-desc">Use <code>useFeatureGate()</code> hook for custom conditional logic in components.</div>
+      </div>
+    </div>
+
+    <h3>Combining gates</h3>
+    <p>
+      Gates compose naturally. Use multiple gates in sequence for complex access rules:
+    </p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">tsx</span></div>
+      <pre><code><span class="tok-comment">{/* Must be logged in AND on pro+ AND not have exceeded meter */}</span>
+&lt;<span class="tok-cmd">AuthGate</span> fallback={&lt;LoginPrompt /&gt;}&gt;
+  &lt;<span class="tok-cmd">FeatureGate</span> feature=<span class="tok-string">"ai_analysis"</span>&gt;
+    &lt;<span class="tok-cmd">MeterGate</span> meter=<span class="tok-string">"api_calls"</span> fallback={&lt;LimitReachedBanner /&gt;}&gt;
+      &lt;<span class="tok-cmd">AIAnalysisPanel</span> /&gt;
+    &lt;/MeterGate&gt;
+  &lt;/FeatureGate&gt;
+&lt;/AuthGate&gt;</code></pre>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="billing.html">← Stripe Billing</a>
+        <a href="agents.html">Agent Integration →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

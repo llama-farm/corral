@@ -1,0 +1,22 @@
+[package]
+name = "corral-validate"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal session validation for Corral/Better Auth"
+license = "MIT"
+
+[dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = "0.4"
+
+[dependencies.axum]
+version = "0.7"
+optional = true
+
+[dependencies.async-trait]
+version = "0.1"
+optional = true
+
+[features]
+default = []
+axum = ["dep:axum", "dep:async-trait"]

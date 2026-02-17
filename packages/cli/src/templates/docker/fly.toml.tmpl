@@ -1,0 +1,42 @@
+# =============================================================================
+# Fly.io Config — {{APP_NAME}}
+# =============================================================================
+# Deploys a single container running Corral auth + your backend.
+# Only the backend port is exposed. Auth stays internal.
+# =============================================================================
+
+app = "{{APP_NAME}}"
+primary_region = "{{FLY_REGION}}"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  AUTH_PORT = "3456"
+  AUTH_URL = "http://localhost:3456"
+  PORT = "8000"
+  CORRAL_DB_PATH = "/app/data/corral.db"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+# Persistent volume for SQLite DB
+[mounts]
+  source = "corral_data"
+  destination = "/app/data"

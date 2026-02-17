@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLI Reference — Corral Docs</title>
+  <meta name="description" content="Complete reference for all Corral CLI commands with examples.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="page-body">
+
+<nav class="top-nav">
+  <a href="index.html" class="nav-logo"><span class="logo-emoji">🐴</span> Corral</a>
+  <div class="nav-links">
+    <a href="quickstart.html">Quickstart</a>
+    <a href="concepts.html">Concepts</a>
+    <a href="cli.html" class="active">CLI</a>
+    <a href="frameworks.html">Frameworks</a>
+    <a href="billing.html">Billing</a>
+    <a href="gating.html">Gating</a>
+    <a href="agents.html">Agents</a>
+    <a href="api.html">API</a>
+  </div>
+  <div class="nav-right">
+    <a href="https://github.com/llama-farm/corral" class="nav-github" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Getting Started</div>
+      <ul class="sidebar-nav">
+        <li><a href="quickstart.html">Quickstart</a></li>
+        <li><a href="concepts.html">Core Concepts</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">On This Page</div>
+      <ul class="sidebar-nav">
+        <li><a href="#global-flags">Global Flags</a></li>
+        <li><a href="#init">init</a></li>
+        <li><a href="#analyze">analyze</a></li>
+        <li><a href="#add">add</a></li>
+        <li><a href="#validate">validate</a></li>
+        <li><a href="#doctor">doctor</a></li>
+        <li><a href="#status">status</a></li>
+        <li><a href="#rollback">rollback</a></li>
+        <li><a href="#stripe">stripe</a></li>
+        <li><a href="#seed">seed</a></li>
+        <li><a href="#dev">dev</a></li>
+        <li><a href="#llms-txt">llms-txt</a></li>
+        <li><a href="#promote">promote</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Reference</div>
+      <ul class="sidebar-nav">
+        <li><a href="api.html">API Reference</a></li>
+        <li><a href="frameworks.html">Framework Guides</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="docs-content">
+    <h1>CLI Reference</h1>
+    <p class="docs-lead">
+      The <code>corral</code> CLI is how you scaffold, configure, and manage
+      your Corral installation. Every command supports <code>--json</code>
+      for machine-readable output and <code>--help</code> for usage info.
+    </p>
+
+    <div class="callout info">
+      <div class="callout-title">Installation</div>
+      The CLI is available via <code>npx corral &lt;command&gt;</code> (no install needed)
+      or globally with <code>npm install -g @corral/cli</code>.
+    </div>
+
+    <!-- ── Global Flags ──────────────────────────────── -->
+    <h2 id="global-flags">Global Flags</h2>
+    <p>These flags work on every command:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>--json</code></td><td>Output structured JSON. Exit code 0 = success, 1 = error.</td></tr>
+          <tr><td><code>--config &lt;path&gt;</code></td><td>Path to <code>corral.yaml</code> (default: <code>./corral.yaml</code>)</td></tr>
+          <tr><td><code>--env &lt;name&gt;</code></td><td>Load <code>.env.&lt;name&gt;</code> (e.g. <code>--env production</code>)</td></tr>
+          <tr><td><code>--yes</code></td><td>Skip all interactive prompts, accept defaults</td></tr>
+          <tr><td><code>--no-color</code></td><td>Disable color output</td></tr>
+          <tr><td><code>--verbose</code></td><td>Show debug output</td></tr>
+          <tr><td><code>--help</code></td><td>Show help for this command</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── init ─────────────────────────────────────── -->
+    <h2 id="init">init</h2>
+    <p>Scaffold Corral into an existing project. Analyzes your project and generates all necessary files.</p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>npx corral init [options]
+
+Options:
+  --framework &lt;name&gt;   Force framework (nextjs|express|hono|fastify|vite)
+  --db &lt;adapter&gt;       Force database adapter (prisma|drizzle|sqlite|postgres)
+  --no-billing         Skip Stripe setup
+  --no-admin           Skip admin page generation
+  --yes                Accept all defaults (agent mode)
+  --output &lt;dir&gt;       Output directory (default: cwd)</code></pre>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+        <span class="terminal-title">corral init --yes --json</span>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral init --yes --json</span>
+        <span class="terminal-line output">{</span>
+        <span class="terminal-line output">  "status": "ok",</span>
+        <span class="terminal-line output">  "framework": "nextjs",</span>
+        <span class="terminal-line output">  "files_created": [</span>
+        <span class="terminal-line output">    "corral.yaml",</span>
+        <span class="terminal-line output">    "src/app/api/auth/[...corral]/route.ts",</span>
+        <span class="terminal-line output">    "src/app/api/billing/[...corral]/route.ts",</span>
+        <span class="terminal-line output">    "src/lib/corral.ts",</span>
+        <span class="terminal-line output">    "CORRAL.md"</span>
+        <span class="terminal-line output">  ],</span>
+        <span class="terminal-line output">  "next_steps": ["npm install @corral/core @corral/next", "corral validate"]</span>
+        <span class="terminal-line output">}</span>
+      </div>
+    </div>
+
+    <!-- ── analyze ──────────────────────────────────── -->
+    <h2 id="analyze">analyze</h2>
+    <p>Analyze a project's structure and report what Corral would detect. Read-only — writes nothing.</p>
+
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral analyze [path] [options]
+
+Options:
+  --json   Output structured detection report</code></pre>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral analyze --json</span>
+        <span class="terminal-line output">{</span>
+        <span class="terminal-line output">  "framework": "nextjs",</span>
+        <span class="terminal-line output">  "router": "app",</span>
+        <span class="terminal-line output">  "typescript": true,</span>
+        <span class="terminal-line output">  "database": "prisma",</span>
+        <span class="terminal-line output">  "existing_auth": null,</span>
+        <span class="terminal-line output">  "existing_billing": null,</span>
+        <span class="terminal-line output">  "corral_installed": false,</span>
+        <span class="terminal-line output">  "recommended_adapters": ["@corral/core", "@corral/next"]</span>
+        <span class="terminal-line output">}</span>
+      </div>
+    </div>
+
+    <!-- ── add ──────────────────────────────────────── -->
+    <h2 id="add">add</h2>
+    <p>
+      Incrementally add capabilities to an existing Corral installation.
+      All <code>add</code> subcommands are idempotent — safe to run multiple times.
+    </p>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">add subcommands</div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add page</span>
+          <span class="cmd-args">&lt;path&gt; [--gate &lt;feature&gt;] [--plan &lt;plan&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Add a new gated page to the app.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add page /reports/advanced --gate ai_analysis --plan pro
+<span class="tok-comment"># Creates src/app/reports/advanced/page.tsx with PageGate wrapper</span></code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add feature</span>
+          <span class="cmd-args">&lt;name&gt; --plans &lt;list&gt; [--gate &lt;mode&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Define a new feature gate in <code>corral.yaml</code>.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add feature ai_analysis --plans pro,enterprise --gate blur
+corral add feature bulk_export --plans enterprise --gate block</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add meter</span>
+          <span class="cmd-args">&lt;name&gt; [--limit &lt;n&gt;] [--window &lt;period&gt;] [--overage &lt;mode&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Add a usage meter with per-plan limits.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add meter api_calls \
+  --free 500 --pro 10000 --enterprise unlimited \
+  --window month --overage block</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add provider</span>
+          <span class="cmd-args">&lt;name&gt; [--scopes &lt;list&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Add an auth provider. Updates <code>corral.yaml</code> and generates OAuth callback routes.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add provider google
+corral add provider github --scopes read:user,user:email
+corral add provider saml --metadata-url https://idp.example.com/metadata</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add plan</span>
+          <span class="cmd-args">&lt;name&gt; [--price &lt;n&gt;] [--interval month|year] [--trial &lt;days&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Add a billing plan. Run <code>corral stripe push</code> after to sync to Stripe.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add plan pro --price 49 --interval month --trial 14
+corral add plan annual --price 490 --interval year --inherits pro</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add webhook</span>
+          <span class="cmd-args">&lt;event&gt; [--handler &lt;path&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Add a Stripe webhook handler.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add webhook customer.subscription.updated
+corral add webhook invoice.payment_failed --handler src/handlers/invoice-failed.ts</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add device-verify</span>
+          <span class="cmd-args">[--page &lt;path&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Generate the device auth approval page (user enters code from CLI).</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add device-verify --page /auth/activate</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral add admin-page</span>
+          <span class="cmd-args">[--path &lt;route&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Generate the admin dashboard page at the specified route.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral add admin-page --path /admin</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── validate ─────────────────────────────────── -->
+    <h2 id="validate">validate</h2>
+    <p>
+      Validate the <code>corral.yaml</code> config against live state:
+      environment variables, database connectivity, Stripe product sync, and feature consistency.
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral validate [options]
+
+Options:
+  --strict     Fail on warnings (for CI)
+  --json       Structured output
+  --env &lt;name&gt; Environment to validate against</code></pre>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div><div class="terminal-dot yellow"></div><div class="terminal-dot green"></div>
+      </div>
+      <div class="terminal-body">
+        <span class="terminal-line cmd">corral validate --strict --json</span>
+        <span class="terminal-line output">{</span>
+        <span class="terminal-line output">  "status": "ok",</span>
+        <span class="terminal-line output">  "checks": {</span>
+        <span class="terminal-line output">    "config_syntax": "pass",</span>
+        <span class="terminal-line output">    "env_vars": "pass",</span>
+        <span class="terminal-line output">    "database": "pass",</span>
+        <span class="terminal-line output">    "stripe_products": "pass",</span>
+        <span class="terminal-line output">    "feature_gates": "pass"</span>
+        <span class="terminal-line output">  },</span>
+        <span class="terminal-line output">  "warnings": [],</span>
+        <span class="terminal-line output">  "errors": []</span>
+        <span class="terminal-line output">}</span>
+      </div>
+    </div>
+
+    <!-- ── doctor ───────────────────────────────────── -->
+    <h2 id="doctor">doctor</h2>
+    <p>
+      Deep health check: validates config, tests all provider connections, 
+      checks for known misconfigurations and version mismatches.
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral doctor
+
+# Output:
+# ✓ corral.yaml valid
+# ✓ @corral/core v0.1.0 matches CLI v0.1.0
+# ✓ Database connection OK
+# ✓ Google OAuth: client_id set, callback URL registered
+# ✗ SMTP: connection refused at smtp.example.com:587
+#   → Fix: check SMTP_URL in .env.local</code></pre>
+    </div>
+
+    <!-- ── status ───────────────────────────────────── -->
+    <h2 id="status">status</h2>
+    <p>Show the current state of Corral in the running app (plan counts, active meters, recent auth events).</p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral status [--json] [--env &lt;name&gt;]
+
+# Output:
+# Users:     1,284 total  (47 new this week)
+# Plans:     free=892  pro=347  enterprise=45
+# Meters:    api_calls=89,234/1,000,000 this month
+# Stripe:    live mode, webhooks OK
+# Last auth: 3 minutes ago</code></pre>
+    </div>
+
+    <!-- ── rollback ──────────────────────────────────── -->
+    <h2 id="rollback">rollback</h2>
+    <p>
+      Rollback to the previous <code>corral.yaml</code> state.
+      Corral keeps a history of config snapshots (default: 10).
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral rollback [--to &lt;snapshot-id&gt;] [--list] [--json]
+
+# List available snapshots:
+corral rollback --list
+
+# Rollback to previous:
+corral rollback
+
+# Rollback to specific snapshot:
+corral rollback --to snap_2024-01-15_14-23</code></pre>
+    </div>
+
+    <!-- ── stripe ───────────────────────────────────── -->
+    <h2 id="stripe">stripe</h2>
+    <p>Commands for managing Stripe integration.</p>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">stripe subcommands</div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral stripe push</span>
+          <span class="cmd-args">[--dry-run]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Sync <code>corral.yaml</code> plans to Stripe. Creates or updates Products and Prices. Writes price IDs to env.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral stripe push
+corral stripe push --dry-run    <span class="tok-comment"># preview changes without applying</span>
+corral stripe push --env production</code></pre></div>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral stripe verify</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Verify that Stripe products + prices match <code>corral.yaml</code>. Reports drift.</p>
+        </div>
+      </div>
+
+      <div class="cmd-entry">
+        <div class="cmd-entry-header">
+          <span class="cmd-name">corral stripe test</span>
+          <span class="cmd-args">[--plan &lt;name&gt;] [--email &lt;email&gt;]</span>
+        </div>
+        <div class="cmd-entry-body">
+          <p>Run a test checkout + webhook cycle using Stripe test mode. Useful in CI.</p>
+          <div class="code-block"><div class="code-block-header"><span class="code-lang">bash</span></div>
+          <pre><code>corral stripe test --plan pro --email test@horizon.mil</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── seed ─────────────────────────────────────── -->
+    <h2 id="seed">seed</h2>
+    <p>Seed test users into the database. Useful for development and CI.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral seed [options]
+
+Options:
+  --env &lt;name&gt;     Environment (default: development)
+  --count &lt;n&gt;      Number of users per plan (default: 3)
+  --plan &lt;name&gt;    Seed only this plan
+  --reset          Delete all test users first
+  --json           Structured output with created user IDs
+
+# Example: seed 5 users per plan
+corral seed --count 5 --json
+
+# Output:
+# Created user: alice@horizon-test.com (plan: free)
+# Created user: bob@horizon-test.com (plan: pro)
+# Created user: carol@horizon-test.com (plan: enterprise)
+# Created user: admin@horizon-test.com (role: admin)</code></pre>
+    </div>
+
+    <!-- ── dev ──────────────────────────────────────── -->
+    <h2 id="dev">dev</h2>
+    <p>
+      Run a development server for Corral's auth + billing routes independently of
+      your app. Useful when testing the auth flow in isolation or when your app's
+      dev server conflicts with Corral's routes.
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral dev [options]
+
+Options:
+  --port &lt;n&gt;       Port to listen on (default: 3001)
+  --host &lt;host&gt;    Host to bind to (default: localhost)
+  --watch          Watch corral.yaml for changes and reload
+
+# Example:
+corral dev --port 3001 --watch
+
+# Corral dev server running at http://localhost:3001
+# Auth:    http://localhost:3001/api/auth
+# Billing: http://localhost:3001/api/billing
+# Admin:   http://localhost:3001/admin
+# llms.txt: http://localhost:3001/api/llms.txt</code></pre>
+    </div>
+
+    <!-- ── llms-txt ──────────────────────────────────── -->
+    <h2 id="llms-txt">llms-txt</h2>
+    <p>
+      Generate (or print) the <code>llms.txt</code> for the current project.
+      This is also auto-served at <code>/api/llms.txt</code> when your app is running.
+    </p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral llms-txt [options]
+
+Options:
+  --output &lt;path&gt;   Write to file instead of stdout
+  --full            Generate llms-full.txt (extended version with examples)
+  --update          Regenerate and overwrite CORRAL.md in project root
+
+# Examples:
+corral llms-txt                        # print to stdout
+corral llms-txt --output llms.txt      # write to file
+corral llms-txt --full --output llms-full.txt
+corral llms-txt --update               # refresh CORRAL.md</code></pre>
+    </div>
+
+    <!-- ── promote ──────────────────────────────────── -->
+    <h2 id="promote">promote</h2>
+    <p>Promote a user to admin role or change their plan.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span class="code-lang">bash</span></div>
+      <pre><code>corral promote &lt;email&gt; &lt;role|plan&gt; [options]
+
+# Examples:
+corral promote alice@horizon.mil admin
+corral promote bob@horizon.mil pro
+corral promote carol@horizon.mil enterprise --no-stripe  <span class="tok-comment"># skip Stripe subscription</span>
+
+# With --json:
+corral promote alice@horizon.mil admin --json
+# { "status": "ok", "user": { "id": "usr_...", "email": "alice@...", "role": "admin" } }</code></pre>
+    </div>
+
+    <div class="docs-footer">
+      <span>MIT License · <a href="https://github.com/llama-farm/corral" target="_blank" rel="noopener">GitHub</a> · Built by <a href="https://github.com/llama-farm" target="_blank" rel="noopener">LlamaFarm 🦙</a></span>
+      <div class="docs-nav-links">
+        <a href="concepts.html">← Core Concepts</a>
+        <a href="frameworks.html">Framework Guides →</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

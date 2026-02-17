@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "corral-validate"
+version = "0.1.0"
+description = "Minimal session validation for Corral/Better Auth"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Llama Farm"}]
+
+[project.optional-dependencies]
+postgres = ["psycopg2-binary"]

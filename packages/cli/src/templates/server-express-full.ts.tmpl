@@ -1,0 +1,113 @@
+// {{APP_NAME}} — Corral Auth + Billing Server (Express)
+// Full-featured: auth, checkout, billing portal, webhooks, device auth
+// Run with: npx tsx server/auth.ts
+
+import express from "express";
+import cors from "cors";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./corral.js";
+import { createCorralRoutes } from "@llamafarm/corral/routes";
+
+const app = express();
+const port = parseInt(process.env.CORRAL_PORT || "{{PORT}}");
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// ─── Stripe (optional — billing features) ──────────────────────────
+let stripe: any = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  const Stripe = (await import("stripe")).default;
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  console.log("💳 Stripe connected");
+}
+
+// ─── CORS ──────────────────────────────────────────────────────────
+app.use(cors({
+  origin: [corsOrigin, corsOrigin.replace("localhost", "127.0.0.1")],
+  credentials: true,
+}));
+
+// ─── Stripe Webhook (must be before json parser — needs raw body) ──
+if (stripe && process.env.STRIPE_WEBHOOK_SECRET) {
+  app.post("/webhook/stripe",
+    express.raw({ type: "application/json" }),
+    async (req, res) => {
+      try {
+        const event = stripe.webhooks.constructEvent(
+          req.body, req.headers["stripe-signature"]!, process.env.STRIPE_WEBHOOK_SECRET!
+        );
+
+        console.log(`[Stripe] ${event.type}`);
+
+        switch (event.type) {
+          case "checkout.session.completed": {
+            const session = event.data.object;
+            const userId = session.metadata?.userId;
+            const planId = session.metadata?.planId;
+            if (userId && planId) {
+              // Update user plan in database
+              // TODO: Use auth.api or direct DB query
+              console.log(`[Stripe] User ${userId} → plan ${planId}`);
+            }
+            break;
+          }
+          case "customer.subscription.deleted": {
+            const sub = event.data.object;
+            const userId = sub.metadata?.userId;
+            if (userId) {
+              console.log(`[Stripe] User ${userId} → plan free (subscription canceled)`);
+            }
+            break;
+          }
+          case "invoice.payment_failed": {
+            console.log(`[Stripe] Payment failed for ${event.data.object.customer}`);
+            break;
+          }
+        }
+
+        res.json({ received: true });
+      } catch (err: any) {
+        console.error(`[Stripe] Webhook error: ${err.message}`);
+        res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    }
+  );
+  console.log("🔔 Stripe webhooks enabled at /webhook/stripe");
+}
+
+// ─── JSON parser (after webhook route) ─────────────────────────────
+app.use(express.json());
+
+// ─── Better Auth ───────────────────────────────────────────────────
+const authHandler = toNodeHandler(auth);
+try {
+  app.all("/api/auth/*splat", (req, res) => authHandler(req, res));
+} catch {
+  app.all("/api/auth/*", (req, res) => authHandler(req, res));
+}
+
+// ─── Corral API (checkout, billing, device auth) ───────────────────
+const plans = [
+  // TODO: Load from corral.yaml
+  { id: "free", name: "Free", price: 0, period: "forever", features: ["Basic access"], stripePriceId: undefined },
+  { id: "pro", name: "Pro", price: 29, period: "/month", features: ["Everything"], highlighted: true, trialDays: 14,
+    stripePriceId: process.env.STRIPE_PRICE_PRO },
+];
+
+const corralHandler = createCorralRoutes(auth, stripe, {
+  plans,
+  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  successUrl: corsOrigin,
+  cancelUrl: corsOrigin,
+});
+app.use("/api/corral", (req, res) => corralHandler(req, res));
+
+// ─── Health check ──────────────────────────────────────────────────
+app.get("/health", (_req, res) => res.json({ ok: true, stripe: !!stripe }));
+
+// ─── Start ─────────────────────────────────────────────────────────
+app.listen(port, "0.0.0.0", () => {
+  console.log(`🤠 Corral server running on http://localhost:${port}`);
+  console.log(`   Auth: http://localhost:${port}/api/auth/*`);
+  console.log(`   API:  http://localhost:${port}/api/corral/*`);
+  console.log(`   CORS: ${corsOrigin}`);
+});
