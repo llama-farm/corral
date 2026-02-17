@@ -39,7 +39,9 @@ export const ConfigSchema = z.object({
     url: z.string().optional(),
   }),
   database: z.object({
+    adapter: z.string().optional(),
     url: z.string(),
+    auto_migrate: z.boolean().optional(),
   }).optional(),
   auth: z.object({
     providers: z.array(z.string()).optional(),

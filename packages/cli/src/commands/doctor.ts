@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import chalk from 'chalk';
 import { success, error, info, warn, jsonOutput } from '../util.js';
+import { loadConfig } from '../config.js';
 
 interface Check {
   name: string;
@@ -22,6 +23,10 @@ export async function doctorCommand(opts: { json?: boolean; config: string; url?
     checks.push({ name: 'Config file exists', status: 'fail', detail: `${opts.config} not found. Run: corral init` });
     error(`${opts.config} not found — run: corral init`);
   }
+
+  // Load config for subsequent checks (safe — returns null if missing/invalid)
+  let config: ReturnType<typeof loadConfig> | null = null;
+  try { config = loadConfig(opts.config); } catch { /* config stays null */ }
 
   // ─── 2. Environment variables ───────────────────────────────────────
   // Check .env file
