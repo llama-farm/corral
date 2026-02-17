@@ -23,7 +23,7 @@ const program = new Command();
 program
   .name('corral')
   .description('🐄 Corral — Embedded auth + billing SDK')
-  .version('0.1.0')
+  .version('0.4.1')
   .option('--json', 'Output as JSON')
   .option('--config <path>', 'Config file path', 'corral.yaml')
   .option('--verbose', 'Verbose output');
