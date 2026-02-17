@@ -9,8 +9,8 @@ app:
   # support_email: "support@example.com"
 
 database:
-  adapter: sqlite          # sqlite | pg | mysql
-  url: "file:./corral.db"  # For pg: postgresql://localhost:5432/{{APP_ID}}
+  adapter: {{DB_ADAPTER}}          # sqlite | pg | mysql | turso | d1
+  url: "{{DB_URL}}"
   auto_migrate: true
 
 # ── Authentication ─────────────────────────────────────────────────────

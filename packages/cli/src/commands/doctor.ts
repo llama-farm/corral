@@ -154,7 +154,10 @@ export async function doctorCommand(opts: { json?: boolean; config: string; url?
     const setupContent = readFileSync(foundSetup, 'utf-8');
     // Strip comments before checking — comments with examples can cause false positives
     const setupNoComments = setupContent.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-    if (setupNoComments.includes('type: "sqlite"') || setupNoComments.includes("type: 'sqlite'")) {
+    // Turso and D1 correctly use { db, type: "sqlite" } — only flag for plain SQLite
+    const dbAdapter = config?.database?.adapter || 'sqlite';
+    const tursoOrD1 = dbAdapter === 'turso' || dbAdapter === 'd1';
+    if (!tursoOrD1 && (setupNoComments.includes('type: "sqlite"') || setupNoComments.includes("type: 'sqlite'"))) {
       checks.push({
         name: 'Database adapter format',
         status: 'fail',
