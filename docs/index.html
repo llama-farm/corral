@@ -169,55 +169,87 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
 
 <!-- ── Hero ────────────────────────────────────────────────────── -->
 <section class="hero">
-  <div class="hero-agent-badge">
-    🤖 Built for AI Coding Agents
-  </div>
 
-  <h1 class="hero-logo">
+  <h1 class="hero-logo" style="margin-bottom:8px">
     <span class="logo-emoji">🦙</span>Corral
   </h1>
 
-  <p class="hero-tagline">Auth + Payments Your Agent Can Set Up</p>
-
-  <p class="hero-subtitle">
-    Point your AI coding assistant at Corral. Tell it what you need.
-    Login, Stripe billing, feature gating — done in one conversation.
+  <p class="hero-tagline" style="font-size:clamp(1.1rem,3vw,1.6rem);max-width:700px;color:var(--text);font-weight:800;letter-spacing:-0.02em;line-height:1.3;margin-bottom:20px">
+    You don't add auth to your app.<br>
+    <span style="color:var(--accent)">Your agent does.</span>
   </p>
 
-  <p style="font-size:0.9rem;color:#a5b4fc;margin-top:-8px;margin-bottom:0">
-    Built for OpenClaw, Claude Code, Codex, and Cursor
+  <p class="hero-subtitle" style="max-width:600px;font-size:1.1rem;margin-bottom:12px">
+    Paste one prompt. Your AI coding agent reads the spec, scaffolds auth,
+    wires Stripe billing, adds feature gating, builds the admin dashboard.
+    <strong style="color:var(--text)">You never touch auth code.</strong>
   </p>
 
-  <!-- Copy-paste prompt box -->
-  <div class="hero-prompt" style="margin-top:28px;max-width:680px;margin-left:auto;margin-right:auto">
-    <p style="font-size:0.85rem;color:#a5b4fc;margin-bottom:10px;text-align:center">
-      📋 Copy this into your AI agent to get started:
+  <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:32px">
+    Works with Claude Code · Cursor · Codex · OpenClaw · Windsurf · any agent that runs CLI commands
+  </p>
+
+  <!-- ── Copy-paste prompts ─────────────────────────────────────── -->
+  <div style="width:100%;max-width:720px;margin:0 auto">
+    <p style="font-size:0.95rem;font-weight:700;color:var(--accent);margin-bottom:16px;text-align:center;letter-spacing:0.02em">
+      ↓&nbsp; Copy. Paste into your agent. Done. &nbsp;↓
     </p>
-    <div class="hero-prompt-box" style="position:relative;background:rgba(15,17,23,0.8);border:1px solid rgba(99,102,241,0.4);border-radius:10px;padding:16px 20px;font-family:var(--font-mono);font-size:0.82rem;line-height:1.7;color:#c9d1d9;cursor:pointer" onclick="copyPrompt(this)">
-      <span style="position:absolute;top:8px;right:12px;font-size:0.7rem;color:#6366f1;opacity:0.8" class="copy-hint">click to copy</span>
-<span style="color:#86efac">Read: https://llama-farm.github.io/corral/llms.txt</span>
 
-<span style="color:#f9a8d4">Add auth and Stripe billing to my app.</span>
-<span style="color:#f9a8d4">Free tier + Pro at $29/mo with 14-day trial.</span>
-<span style="color:#f9a8d4">Wire up everything: login, signup, profile page,</span>
-<span style="color:#f9a8d4">admin dashboard, upgrade banners, and feature gating.</span>
+    <!-- Prompt 1: Full setup -->
+    <div class="prompt-card" onclick="copyPrompt(this, 'full')" style="position:relative;background:#0d1117;border:2px solid var(--accent-dim);border-radius:12px;padding:20px 24px;margin-bottom:14px;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s" onmouseenter="this.style.borderColor='var(--accent)';this.style.boxShadow='0 0 20px rgba(245,158,11,0.15)'" onmouseleave="this.style.borderColor='var(--accent-dim)';this.style.boxShadow='none'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent)">⚡ Full Setup — auth + billing + everything</span>
+        <span class="copy-hint" style="font-size:0.7rem;color:var(--text-dim);transition:color 0.2s">click to copy</span>
+      </div>
+      <pre style="font-family:var(--font-mono);font-size:0.85rem;line-height:1.7;color:#c9d1d9;margin:0;white-space:pre-wrap;word-break:break-word"><span style="color:#86efac">Read: https://llama-farm.github.io/corral/llms.txt</span>
+
+<span style="color:#e5e5e5">Add auth and Stripe billing to my app. Free tier + Pro</span>
+<span style="color:#e5e5e5">at $29/mo with 14-day trial. Wire up everything: login,</span>
+<span style="color:#e5e5e5">signup, profile page, admin dashboard, upgrade banners,</span>
+<span style="color:#e5e5e5">and feature gating.</span></pre>
+    </div>
+
+    <!-- Prompt 2: Just auth -->
+    <div class="prompt-card" onclick="copyPrompt(this, 'auth')" style="position:relative;background:#0d1117;border:1px solid var(--bg-border);border-radius:12px;padding:16px 24px;margin-bottom:14px;cursor:pointer;transition:border-color 0.2s" onmouseenter="this.style.borderColor='var(--accent-dim)'" onmouseleave="this.style.borderColor='var(--bg-border)'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted)">🔐 Just Auth — no billing</span>
+        <span class="copy-hint" style="font-size:0.7rem;color:var(--text-dim)">click to copy</span>
+      </div>
+      <pre style="font-family:var(--font-mono);font-size:0.82rem;line-height:1.6;color:#8b949e;margin:0;white-space:pre-wrap"><span style="color:#86efac">Read: https://llama-farm.github.io/corral/llms.txt</span>
+<span style="color:#c9d1d9">Add authentication to my app with email + Google login.</span></pre>
+    </div>
+
+    <!-- Prompt 3: Add to existing -->
+    <div class="prompt-card" onclick="copyPrompt(this, 'existing')" style="position:relative;background:#0d1117;border:1px solid var(--bg-border);border-radius:12px;padding:16px 24px;margin-bottom:0;cursor:pointer;transition:border-color 0.2s" onmouseenter="this.style.borderColor='var(--accent-dim)'" onmouseleave="this.style.borderColor='var(--bg-border)'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted)">🔧 Add to Existing Project</span>
+        <span class="copy-hint" style="font-size:0.7rem;color:var(--text-dim)">click to copy</span>
+      </div>
+      <pre style="font-family:var(--font-mono);font-size:0.82rem;line-height:1.6;color:#8b949e;margin:0;white-space:pre-wrap"><span style="color:#86efac">Read: https://llama-farm.github.io/corral/llms.txt</span>
+<span style="color:#c9d1d9">Add Corral auth + billing to this project. Detect my</span>
+<span style="color:#c9d1d9">framework and embed into my existing server.</span></pre>
     </div>
   </div>
+
   <script>
-  function copyPrompt(el) {
-    var text = 'Read: https://llama-farm.github.io/corral/llms.txt\n\nAdd auth and Stripe billing to my app. Free tier + Pro at $29/mo with 14-day trial. Wire up everything: login, signup, profile page, admin dashboard, upgrade banners, and feature gating.';
-    navigator.clipboard.writeText(text).then(function() {
+  var promptTexts = {
+    full: 'Read: https://llama-farm.github.io/corral/llms.txt\n\nAdd auth and Stripe billing to my app. Free tier + Pro at $29/mo with 14-day trial. Wire up everything: login, signup, profile page, admin dashboard, upgrade banners, and feature gating.',
+    auth: 'Read: https://llama-farm.github.io/corral/llms.txt\n\nAdd authentication to my app with email + Google login.',
+    existing: 'Read: https://llama-farm.github.io/corral/llms.txt\n\nAdd Corral auth + billing to this project. Detect my framework and embed into my existing server.'
+  };
+  function copyPrompt(el, key) {
+    navigator.clipboard.writeText(promptTexts[key]).then(function() {
       var hint = el.querySelector('.copy-hint');
       hint.textContent = '✓ copied!';
-      hint.style.color = '#86efac';
-      setTimeout(function() { hint.textContent = 'click to copy'; hint.style.color = '#6366f1'; }, 2000);
+      hint.style.color = '#22c55e';
+      setTimeout(function() { hint.textContent = 'click to copy'; hint.style.color = 'var(--text-dim)'; }, 2000);
     });
   }
   </script>
 
-  <div class="hero-actions" style="margin-top:24px">
+  <div class="hero-actions" style="margin-top:36px">
     <a href="agents.html" class="btn btn-primary">
-      For Agents →
+      How It Works →
     </a>
     <a href="quickstart.html" class="btn btn-secondary">
       Quickstart
@@ -230,27 +262,6 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
     </a>
   </div>
 
-  <!-- Terminal animation — agent conversation -->
-  <div class="hero-terminal">
-    <div class="terminal">
-      <div class="terminal-bar">
-        <div class="terminal-dot red"></div>
-        <div class="terminal-dot yellow"></div>
-        <div class="terminal-dot green"></div>
-        <span class="terminal-title">~/projects/my-saas-app</span>
-      </div>
-      <div class="terminal-body">
-        <span class="terminal-line user anim-line">You: "Add auth and Stripe billing to my app. Free tier and Pro at $29/mo."</span>
-        <span class="terminal-line agent anim-line">Agent: Reading llms.txt... Running npm create corral...</span>
-        <span class="terminal-line agent-cont anim-line">✓ corral.yaml configured</span>
-        <span class="terminal-line agent-cont anim-line">✓ Auth routes created</span>
-        <span class="terminal-line agent-cont anim-line">✓ Stripe plans synced</span>
-        <span class="terminal-line agent-cont anim-line">✓ Feature gates wired</span>
-        <span class="terminal-line blank anim-line"></span>
-        <span class="terminal-line done anim-line">Done. Login at localhost:3000/login</span>
-      </div>
-    </div>
-  </div>
 </section>
 
 <hr class="section-sep">
@@ -258,21 +269,28 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
 <!-- ── The Use Case ────────────────────────────────────────────── -->
 <section class="section">
   <p class="section-label">The Problem</p>
-  <h2 class="section-title">The part where AI-built apps always break</h2>
+  <h2 class="section-title">Auth is where every vibe-coded app dies</h2>
 
   <div class="use-case-prose">
     <p>
-      You're building a SaaS app with an AI coding agent. It handles the UI, the API, the database.
-      Then you say <strong>"add auth and payments."</strong> That's where everything breaks —
-      wiring auth to billing to feature flags is the messiest part of any app.
+      Your agent builds the UI in 30 seconds. The API in two minutes. The database schema before
+      you finish your coffee. Then you say <strong>"add auth and payments"</strong> and watch it
+      hallucinate for an hour. Wrong imports. Phantom endpoints. A login page that doesn't connect
+      to anything. <strong>Every. Single. Time.</strong>
     </p>
     <p>
-      <strong>Corral fixes this.</strong> One YAML config. One CLI. Your agent reads the spec,
-      generates the code, and it all just works. Login, signup, social auth, Stripe subscriptions,
-      feature gating, usage meters, admin dashboard — <strong>configured, not coded.</strong>
+      Auth-to-billing-to-gating is the hardest wiring in any app — too many moving parts,
+      too many frameworks, too many ways to get it wrong. Your agent wasn't trained on your
+      exact stack. It guesses. It breaks.
     </p>
     <p>
-      No human touches auth code. No auth docs get read. The agent handles everything.
+      <strong>Corral doesn't guess.</strong> It gives your agent a spec it can actually read —
+      every endpoint, every command, every option. One YAML config. One CLI.
+      Login, Stripe billing, feature gating, admin dashboard, usage meters —
+      <strong>configured in minutes, not coded over days.</strong>
+    </p>
+    <p style="color:var(--accent);font-weight:700;font-size:1.15rem">
+      You don't read auth docs. You don't write auth code. You paste a prompt, and it's done.
     </p>
   </div>
 </section>
@@ -282,9 +300,10 @@ document.querySelector('.nav-toggle').addEventListener('click',function(){docume
 <!-- ── Features ────────────────────────────────────────────────── -->
 <section class="section">
   <p class="section-label">Why Corral</p>
-  <h2 class="section-title">Built for the agent-first world</h2>
+  <h2 class="section-title">Your agent's auth superpowers</h2>
   <p class="section-desc">
-    Auth, billing, and feature gating as a single agent-readable spec.
+    Everything your app needs to charge money and gate features.
+    Your agent reads the spec, runs the CLI, wires the UI. You ship.
   </p>
 
   <div class="feature-grid">
