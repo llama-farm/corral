@@ -508,7 +508,20 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
 
     const gatesPath = join(srcDir, 'gates.tsx');
     if (!existsSync(gatesPath)) {
-      writeFileSync(gatesPath, replaceVars(loadTemplate('gates.tsx.tmpl'), vars));
+      let gatesContent = replaceVars(loadTemplate('gates.tsx.tmpl'), vars);
+      try {
+        const yaml = await import('yaml');
+        const yamlContent = readFileSync(join(process.cwd(), 'corral.yaml'), 'utf-8');
+        const parsedConfig = yaml.parse(yamlContent);
+        const plans = parsedConfig?.plans || [];
+        const planNames: string[] = plans.map((p: any) => typeof p === 'string' ? p : (p.name || '')).filter(Boolean);
+        if (planNames.length > 0) {
+          const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
+          const dynamicRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
+          gatesContent = gatesContent.replace(/const PLAN_RANK: Record<string, number> = \{[^}]*\}/, dynamicRank);
+        }
+      } catch {}
+      writeFileSync(gatesPath, gatesContent);
       results.push(gatesPath);
       success(`Created ${gatesPath} (AuthGate, PlanGate, BlurGate components)`);
     }
@@ -726,7 +739,21 @@ export async function initCommand(opts: { json?: boolean; config: string; db?: s
     const nextGatesPath = join(nextSrcDir, 'gates.tsx');
     if (!existsSync(nextGatesPath)) {
       mkdirSync(dirname(nextGatesPath), { recursive: true });
-      writeFileSync(nextGatesPath, replaceVars(loadTemplate('gates.tsx.tmpl'), vars));
+      let gatesContent = replaceVars(loadTemplate('gates.tsx.tmpl'), vars);
+      // Build PLAN_RANK dynamically from corral.yaml plans
+      try {
+        const yaml = await import('yaml');
+        const yamlContent = readFileSync(join(process.cwd(), 'corral.yaml'), 'utf-8');
+        const parsedConfig = yaml.parse(yamlContent);
+        const plans = parsedConfig?.plans || [];
+        const planNames: string[] = plans.map((p: any) => typeof p === 'string' ? p : (p.name || '')).filter(Boolean);
+        if (planNames.length > 0) {
+          const rankEntries = planNames.map((name: string, i: number) => `  ${name}: ${i}`).join(',\n');
+          const dynamicRank = `const PLAN_RANK: Record<string, number> = {\n${rankEntries}\n}`;
+          gatesContent = gatesContent.replace(/const PLAN_RANK: Record<string, number> = \{[^}]*\}/, dynamicRank);
+        }
+      } catch {}
+      writeFileSync(nextGatesPath, gatesContent);
       results.push(nextGatesPath);
       success(`Created ${nextGatesPath} (AuthGate, PlanGate, BlurGate components)`);
     }
