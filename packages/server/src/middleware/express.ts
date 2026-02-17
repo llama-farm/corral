@@ -42,7 +42,10 @@ export function corral(opts: CorralMiddlewareConfig) {
   const authHandler = toNodeHandler(opts.auth);
   const corralHandler = createCorralRoutes(opts.auth, opts.stripe || null, opts.config);
   const webhookHandler = opts.stripe && opts.config.webhookSecret
-    ? createWebhookHandler(opts.stripe, opts.auth, opts.config)
+    ? createWebhookHandler(opts.stripe, opts.auth, {
+        plans: opts.config.plans || [],
+        webhookSecret: opts.config.webhookSecret || '',
+      })
     : null;
 
   return function corralMiddleware(req: Request, res: Response, next: NextFunction) {

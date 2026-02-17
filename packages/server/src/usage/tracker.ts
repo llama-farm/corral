@@ -23,8 +23,10 @@ export function createUsageTracker(db: any, config: CorralConfig) {
     const limits: Record<string, number> = {};
     const meters = config.meters || {};
     for (const [id, meter] of Object.entries(meters)) {
-      if (meter.limit != null) {
-        limits[id] = meter.limit;
+      if (meter.limits != null) {
+        // Get the first available limit as default
+        const firstLimit = Object.values(meter.limits)[0];
+        if (firstLimit != null) limits[id] = firstLimit;
       }
     }
     return limits;
