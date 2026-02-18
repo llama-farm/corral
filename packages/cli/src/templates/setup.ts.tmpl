@@ -8,6 +8,7 @@
 
 import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
+import { fileURLToPath } from "node:url";
 
 // ─── Database Setup ─────────────────────────────────────────────────
 // Dynamic import keeps this file ESM-safe and allows swapping drivers.
@@ -16,7 +17,7 @@ import { admin } from "better-auth/plugins";
 
 async function createDatabase() {
   const { default: Database } = await import("better-sqlite3");
-  const dbPath = new URL("./corral.db", import.meta.url).pathname;
+  const dbPath = fileURLToPath(new URL("./corral.db", import.meta.url));
   return new Database(dbPath);
 }
 

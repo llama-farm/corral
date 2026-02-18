@@ -24,6 +24,7 @@ async function createDatabaseAdapter(config: CorralConfig): Promise<DatabaseAdap
       neon: "npm install @neondatabase/serverless",
       mysql: "npm install mysql2",
       turso: "npm install @libsql/client",
+      libsql: "npm install @libsql/client",
       planetscale: "npm install @planetscale/database",
     };
     const hint = hints[adapterName] ?? "";

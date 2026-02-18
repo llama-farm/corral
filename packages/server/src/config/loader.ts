@@ -1,5 +1,8 @@
 import { parse as parseYaml } from "yaml";
+import { createRequire } from "node:module";
 import { corralConfigSchema, type CorralConfig } from "./schema.js";
+
+const require = createRequire(import.meta.url);
 
 function resolveEnvVars(obj: unknown): unknown {
   if (typeof obj === "string") {
@@ -35,9 +38,6 @@ export function loadConfig(pathOrConfig: string | Record<string, unknown>): Corr
     // File path — use synchronous fs for backwards compat (Node.js only).
     // In serverless environments, pass a config object or YAML string instead.
     try {
-      // Dynamic import pattern so this module can still be *loaded* in edge
-      // runtimes even though this code path will throw there.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require("node:fs") as typeof import("node:fs");
       const content = fs.readFileSync(pathOrConfig, "utf-8");
       raw = parseYaml(content);

@@ -76,12 +76,6 @@ export async function pgAdapter(url: string): Promise<DatabaseAdapter> {
  * PostgreSQL via `@neondatabase/serverless` — works in Workers / Edge.
  */
 export async function neonAdapter(url: string): Promise<DatabaseAdapter> {
-  const { neon } = await import("@neondatabase/serverless" as string);
-  const sql = neon(url);
-
-  // Neon's serverless driver returns a query function, but Better Auth
-  // expects a Pool-like object. We wrap it with the Pool shim that
-  // @neondatabase/serverless also exports.
   const { Pool } = await import("@neondatabase/serverless" as string);
   const pool = new Pool({ connectionString: url });
 
@@ -89,7 +83,7 @@ export async function neonAdapter(url: string): Promise<DatabaseAdapter> {
     name: "neon",
     instance: pool,
     async exec(ddl: string) {
-      await sql(ddl);
+      await pool.query(ddl);
     },
     async close() {
       await pool.end();
@@ -124,7 +118,7 @@ export async function tursoAdapter(url: string, opts?: Record<string, unknown>):
   const { createClient } = await import("@libsql/client" as string);
   const client = createClient({
     url,
-    authToken: (opts?.authToken as string) ?? process.env.TURSO_AUTH_TOKEN,
+    authToken: (opts?.authToken as string) ?? (typeof process !== "undefined" ? process.env?.TURSO_AUTH_TOKEN : undefined),
   });
 
   return {
@@ -132,6 +126,9 @@ export async function tursoAdapter(url: string, opts?: Record<string, unknown>):
     instance: { db: client, type: "sqlite" },
     async exec(sql: string) {
       // libSQL doesn't support multi-statement exec; split on semicolons.
+      // SAFETY: This naive splitting is fine because the DDL is generated
+      // internally by Corral (see bootstrap.ts), never from user input.
+      // None of the internal DDL contains semicolons within string literals.
       const statements = sql
         .split(";")
         .map((s) => s.trim())
@@ -175,6 +172,9 @@ export async function planetscaleAdapter(url: string): Promise<DatabaseAdapter> 
     instance: conn,
     async exec(sql: string) {
       // PlanetScale doesn't support multi-statement; split on semicolons.
+      // SAFETY: This naive splitting is fine because the DDL is generated
+      // internally by Corral (see bootstrap.ts), never from user input.
+      // None of the internal DDL contains semicolons within string literals.
       const statements = sql
         .split(";")
         .map((s) => s.trim())

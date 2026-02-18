@@ -181,8 +181,91 @@ const USAGE_TABLES_PG = `
   CREATE INDEX IF NOT EXISTS idx_usage_user_meter_period ON "usage"("userId", "meterId", "periodStart");
 `;
 
+const BETTER_AUTH_TABLES_MYSQL = `
+  CREATE TABLE IF NOT EXISTS \`user\` (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    emailVerified BOOLEAN NOT NULL DEFAULT false,
+    image TEXT,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    role VARCHAR(255) DEFAULT 'user',
+    banned BOOLEAN DEFAULT false,
+    banReason TEXT,
+    banExpires DATETIME
+  );
+
+  CREATE TABLE IF NOT EXISTS \`session\` (
+    id VARCHAR(255) PRIMARY KEY,
+    userId VARCHAR(255) NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expiresAt DATETIME NOT NULL,
+    ipAddress VARCHAR(255),
+    userAgent TEXT,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS \`account\` (
+    id VARCHAR(255) PRIMARY KEY,
+    userId VARCHAR(255) NOT NULL,
+    accountId VARCHAR(255) NOT NULL,
+    providerId VARCHAR(255) NOT NULL,
+    accessToken TEXT,
+    refreshToken TEXT,
+    accessTokenExpiresAt DATETIME,
+    refreshTokenExpiresAt DATETIME,
+    scope TEXT,
+    password TEXT,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS \`verification\` (
+    id VARCHAR(255) PRIMARY KEY,
+    identifier VARCHAR(255) NOT NULL,
+    value TEXT NOT NULL,
+    expiresAt DATETIME NOT NULL,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  );
+`;
+
+const USAGE_TABLES_MYSQL = `
+  CREATE TABLE IF NOT EXISTS \`usage_events\` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    userId VARCHAR(255) NOT NULL,
+    meterId VARCHAR(255) NOT NULL,
+    value DOUBLE NOT NULL DEFAULT 1,
+    createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS \`product_config\` (
+    id VARCHAR(255) PRIMARY KEY,
+    config JSON NOT NULL,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS \`usage\` (
+    id VARCHAR(255) PRIMARY KEY,
+    userId VARCHAR(255) NOT NULL,
+    meterId VARCHAR(255) NOT NULL,
+    count INT DEFAULT 0,
+    periodStart VARCHAR(255) NOT NULL,
+    periodEnd VARCHAR(255) NOT NULL,
+    UNIQUE KEY uq_usage_user_meter_period (userId, meterId, periodStart)
+  );
+`;
+
 /** Adapters that use SQLite-flavoured DDL */
 const SQLITE_ADAPTERS = new Set(["sqlite", "turso", "libsql", "d1"]);
+
+/** Adapters that use MySQL-flavoured DDL */
+const MYSQL_ADAPTERS = new Set(["mysql", "planetscale"]);
 
 /**
  * Bootstrap the database: create all tables if they don't exist.
@@ -196,8 +279,9 @@ export async function bootstrapDatabase(
   if (adapterOrDb && typeof adapterOrDb === "object" && "exec" in adapterOrDb && "name" in adapterOrDb) {
     const adapter = adapterOrDb as DatabaseAdapter;
     const isSqlite = SQLITE_ADAPTERS.has(adapter.name);
-    const authDDL = isSqlite ? BETTER_AUTH_TABLES_SQLITE : BETTER_AUTH_TABLES_PG;
-    const usageDDL = isSqlite ? USAGE_TABLES_SQLITE : USAGE_TABLES_PG;
+    const isMysql = MYSQL_ADAPTERS.has(adapter.name);
+    const authDDL = isSqlite ? BETTER_AUTH_TABLES_SQLITE : isMysql ? BETTER_AUTH_TABLES_MYSQL : BETTER_AUTH_TABLES_PG;
+    const usageDDL = isSqlite ? USAGE_TABLES_SQLITE : isMysql ? USAGE_TABLES_MYSQL : USAGE_TABLES_PG;
 
     try {
       await adapter.exec(authDDL);
