@@ -181,7 +181,7 @@ const seedSchema = z.object({
 
 const databaseSchema = z.object({
   url: z.string().default("file:./corral.db"),
-  adapter: z.enum(["sqlite", "pg", "mysql"]).default("sqlite"),
+  adapter: z.enum(["sqlite", "pg", "mysql", "neon", "turso", "libsql", "planetscale", "d1"]).default("sqlite"),
   auto_migrate: z.boolean().default(true),
 }).default({});
 

@@ -7,8 +7,9 @@ import { migrateUsageTables } from "./usage/migrate.js";
 import { seedData } from "./seed/index.js";
 import type { CorralConfig, MeterConfig, PlanConfig } from "./config/schema.js";
 import type { GateResult } from "./usage/gate.js";
+import type { DatabaseAdapter } from "./db/adapters.js";
 
-export type { CorralConfig, MeterConfig, PlanConfig, GateResult };
+export type { CorralConfig, MeterConfig, PlanConfig, GateResult, DatabaseAdapter };
 
 export interface CorralInstance {
   auth: any;
@@ -33,10 +34,9 @@ export async function createCorral(
   configPathOrObject: string | Record<string, unknown>
 ): Promise<CorralInstance> {
   const config = loadConfig(configPathOrObject);
-  const auth = createAuth(config);
+  const auth = await createAuth(config);
 
   // Get the internal DB from Better Auth for usage tables
-  // Better Auth uses Kysely internally; we access it for usage tracking
   let db: any = null;
   let stripeClient: any = null;
 
@@ -44,7 +44,8 @@ export async function createCorral(
   const stripeKey = config.billing.stripe?.secret_key || process.env.STRIPE_SECRET_KEY;
   if (config.billing.provider === "stripe" && stripeKey) {
     try {
-      const { default: Stripe } = await import("stripe");
+      const stripeMod = await import("stripe" as string);
+      const Stripe = stripeMod.default ?? stripeMod;
       stripeClient = new Stripe(stripeKey);
     } catch {
       console.warn("[corral] Stripe SDK not available, billing disabled");
@@ -114,5 +115,7 @@ export async function createCorral(
   };
 }
 
-export { loadConfig } from "./config/loader.js";
+export { loadConfig, loadConfigAsync } from "./config/loader.js";
 export { corralConfigSchema } from "./config/schema.js";
+export { createAdapter, registerAdapter, d1Adapter } from "./db/adapters.js";
+export type { AdapterFactory } from "./db/adapters.js";

@@ -10,7 +10,6 @@
 //   /webhook/stripe — Stripe webhook handler
 
 import type { Request, Response, NextFunction } from 'express';
-import { toNodeHandler } from 'better-auth/node';
 import { createCorralRoutes } from '../routes/corral-router.js';
 import { createWebhookHandler } from '../stripe/webhook.js';
 
@@ -38,7 +37,8 @@ interface CorralMiddlewareConfig {
   };
 }
 
-export function corral(opts: CorralMiddlewareConfig) {
+export async function corral(opts: CorralMiddlewareConfig) {
+  const { toNodeHandler } = await import('better-auth/node');
   const authHandler = toNodeHandler(opts.auth);
   const corralHandler = createCorralRoutes(opts.auth, opts.stripe || null, opts.config);
   const webhookHandler = opts.stripe && opts.config.webhookSecret

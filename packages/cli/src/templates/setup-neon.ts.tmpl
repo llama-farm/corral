@@ -1,0 +1,99 @@
+// {{APP_NAME}} — Corral Auth Setup (Neon Serverless PostgreSQL)
+// Edge-native PostgreSQL — works in Cloudflare Workers, Vercel Edge, Deno Deploy.
+// Set in .env:
+//   DATABASE_URL=postgresql://xxx@xxx.neon.tech/neondb?sslmode=require
+
+import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
+import { Pool } from "@neondatabase/serverless";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Auto-bootstrap tables on first connection
+async function bootstrapDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+      image TEXT,
+      plan TEXT NOT NULL DEFAULT 'free',
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      role TEXT DEFAULT 'user',
+      banned BOOLEAN DEFAULT false,
+      "banReason" TEXT,
+      "banExpires" TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS "session" (
+      id TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "ipAddress" TEXT,
+      "userAgent" TEXT,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS "account" (
+      id TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "accountId" TEXT NOT NULL,
+      "providerId" TEXT NOT NULL,
+      "accessToken" TEXT,
+      "refreshToken" TEXT,
+      "accessTokenExpiresAt" TIMESTAMPTZ,
+      "refreshTokenExpiresAt" TIMESTAMPTZ,
+      scope TEXT,
+      password TEXT,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS "verification" (
+      id TEXT PRIMARY KEY,
+      identifier TEXT NOT NULL,
+      value TEXT NOT NULL,
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_session_token ON "session"(token);
+    CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"("userId");
+    CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"("userId");
+    CREATE INDEX IF NOT EXISTS idx_user_email ON "user"(email);
+  `);
+  console.log("📦 Database tables ready");
+}
+
+bootstrapDatabase().catch(err => {
+  console.error("Failed to bootstrap database:", err.message);
+});
+
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+export const auth = betterAuth({
+  database: pool,
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:{{PORT}}",
+  basePath: "/api/auth",
+  secret: process.env.BETTER_AUTH_SECRET,
+  emailAndPassword: { enabled: true },
+  plugins: [admin()],
+  session: { expiresIn: 60 * 60 * 24 * 30 },
+  user: {
+    additionalFields: {
+      plan: {
+        type: "string" as const,
+        defaultValue: "free",
+      },
+    },
+  },
+  trustedOrigins: [
+    corsOrigin,
+    corsOrigin.replace("localhost", "127.0.0.1"),
+  ],
+});
+
+export type Session = typeof auth.$Infer.Session;

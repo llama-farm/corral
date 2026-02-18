@@ -3,18 +3,24 @@
 //
 // IMPORTANT: This file runs on the SERVER only.
 // The database is auto-bootstrapped on first run — no manual migration needed.
+//
+// ESM-compatible: uses dynamic import() for the database driver.
 
 import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
-import Database from "better-sqlite3";
-import path from "path";
 
-const dbPath = path.resolve(process.cwd(), "corral.db");
+// ─── Database Setup ─────────────────────────────────────────────────
+// Dynamic import keeps this file ESM-safe and allows swapping drivers.
+// To use PostgreSQL, Turso, etc., change the adapter below and install
+// the corresponding package. See CORRAL.md for details.
 
-// Auto-bootstrap: create database and tables if they don't exist.
-// Fully idempotent — safe to run on every server start.
-function bootstrapDatabase(filePath: string) {
-  const db = new Database(filePath);
+async function createDatabase() {
+  const { default: Database } = await import("better-sqlite3");
+  const dbPath = new URL("./corral.db", import.meta.url).pathname;
+  return new Database(dbPath);
+}
+
+async function bootstrapDatabase(db: any) {
   db.pragma("journal_mode = WAL");
 
   db.exec(`
@@ -69,30 +75,20 @@ function bootstrapDatabase(filePath: string) {
     CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"(userId);
     CREATE INDEX IF NOT EXISTS idx_user_email ON "user"(email);
   `);
-
-  return db;
 }
 
-const db = bootstrapDatabase(dbPath);
+// Initialize DB and auth
+const db = await createDatabase();
+await bootstrapDatabase(db);
 
 export const auth = betterAuth({
-  // LEARNING #1: Pass raw Database instance directly.
-  // Do NOT use { db, type: "sqlite" } — causes "selectFrom is not a function".
   database: db,
-
-  // Base URL and path — must match your route handler location
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:{{PORT}}",
   basePath: "/api/auth",
-
-  // Secret for signing tokens — MUST be set in .env
   secret: process.env.BETTER_AUTH_SECRET,
-
-  // Email + password authentication
   emailAndPassword: {
     enabled: true,
   },
-
-  // Custom user fields — plan for gating
   user: {
     additionalFields: {
       plan: {
@@ -101,19 +97,12 @@ export const auth = betterAuth({
       },
     },
   },
-
-  // Plugins
   plugins: [
-    admin(),  // Admin dashboard, user management
+    admin(),
   ],
-
-  // Session config
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
   },
-
-  // LEARNING #5: trustedOrigins required for sign-out CSRF protection.
-  // Auto-detects frontend port from env. Add TRUSTED_ORIGINS (comma-separated) for production.
   trustedOrigins: (() => {
     const frontendPort = process.env.FRONTEND_PORT || process.env.PORT || "{{PORT}}";
     const base = [
@@ -130,50 +119,33 @@ export const auth = betterAuth({
 export type Session = typeof auth.$Infer.Session;
 
 // ─── Auto-seed admin user on first boot ─────────────────────────────
-// Reads seed config from corral.yaml. Only runs once (idempotent).
 (async () => {
   try {
     const existing = db.prepare('SELECT id FROM "user" WHERE role = ?').get('admin');
     if (existing) return;
 
-    const fs = await import('fs');
-    const { createHash, scryptSync, randomBytes } = await import('crypto');
-
-    // Find corral.yaml
-    const yamlPaths = ['corral.yaml', '../corral.yaml', '../frontend/corral.yaml'];
-    let seedEmail = '', seedPassword = '', seedName = 'Admin', seedPlan = '{{DEFAULT_PAID_PLAN}}';
-
-    for (const p of yamlPaths) {
-      const resolved = path.resolve(process.cwd(), p);
-      if (fs.existsSync(resolved)) {
-        const content = fs.readFileSync(resolved, 'utf-8');
-        const emailMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?email:\s*(\S+)/);
-        const passMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?password:\s*(\S+)/);
-        const nameMatch = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?name:\s*(.+)/);
-        if (emailMatch) seedEmail = emailMatch[1];
-        if (passMatch) seedPassword = passMatch[1];
-        if (nameMatch) seedName = nameMatch[1].trim();
-        break;
-      }
-    }
+    const seedEmail = process.env.SEED_ADMIN_EMAIL || "";
+    const seedPassword = process.env.SEED_ADMIN_PASSWORD || "";
+    const seedName = process.env.SEED_ADMIN_NAME || "Admin";
+    const seedPlan = "{{DEFAULT_PAID_PLAN}}" || "free";
 
     if (!seedEmail || !seedPassword) return;
 
-    // Hash password with scrypt
-    const salt = randomBytes(16).toString('hex');
-    const hash = scryptSync(seedPassword, salt, 64).toString('hex');
+    const { createHash, scryptSync, randomBytes } = await import("node:crypto");
+    const salt = randomBytes(16).toString("hex");
+    const hash = scryptSync(seedPassword, salt, 64).toString("hex");
     const hashedPassword = `${salt}:${hash}`;
 
-    const userId = createHash('sha256').update(seedEmail).digest('hex').slice(0, 32);
-    const accountId = createHash('sha256').update(seedEmail + ':credential').digest('hex').slice(0, 32);
+    const userId = createHash("sha256").update(seedEmail).digest("hex").slice(0, 32);
+    const accountId = createHash("sha256").update(seedEmail + ":credential").digest("hex").slice(0, 32);
     const now = new Date().toISOString();
 
     db.prepare(`INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, role, plan, createdAt, updatedAt) VALUES (?, ?, ?, 0, 'admin', ?, ?, ?)`)
-      .run(userId, seedName, seedEmail, seedPlan || 'free', now, now);
+      .run(userId, seedName, seedEmail, seedPlan, now, now);
     db.prepare(`INSERT OR IGNORE INTO "account" (id, userId, accountId, providerId, password, createdAt, updatedAt) VALUES (?, ?, ?, 'credential', ?, ?, ?)`)
       .run(accountId, userId, seedEmail, hashedPassword, now, now);
 
-    console.log(`🤠 Corral: Seeded admin → ${seedEmail} (role=admin, plan=${seedPlan || 'free'})`);
+    console.log(`🤠 Corral: Seeded admin → ${seedEmail} (role=admin, plan=${seedPlan})`);
   } catch (e) {
     // Silent — seeding is best-effort on startup
   }

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { CorralConfig } from "../config/schema.js";
 
 function getCurrentPeriod(resetPeriod: "day" | "month"): string {
@@ -23,7 +22,7 @@ export function createUsageRecorder(config: CorralConfig, db: any, stripeClient?
     await db
       .insertInto("usage_events")
       .values({
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         user_id: userId,
         meter,
         quantity,

@@ -5,8 +5,7 @@
 //   import { createCorralRoutes } from '@llamafarm/corral/routes';
 //   app.use('/api/corral', createCorralRoutes(auth, stripe, config, db));
 
-import type { IncomingMessage, ServerResponse } from 'http';
-import { randomUUID } from 'crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
 interface CorralConfig {
   plans: Array<{
@@ -416,7 +415,7 @@ export function createCorralRoutes(
       db.prepare(
         `INSERT INTO "device_authorization" (id, deviceCode, userCode, status, clientId, expiresAt)
          VALUES (?, ?, ?, 'pending', ?, ?)`
-      ).run(randomUUID(), deviceCode, userCode, clientId, expiresAt);
+      ).run(crypto.randomUUID(), deviceCode, userCode, clientId, expiresAt);
     } else {
       deviceAuthorizations.set(deviceCode, {
         userCode,
@@ -468,7 +467,7 @@ export function createCorralRoutes(
         db.prepare(
           `INSERT INTO "device_token" (id, token, refreshToken, userId, expiresAt, refreshExpiresAt)
            VALUES (?, ?, ?, ?, ?, ?)`
-        ).run(randomUUID(), token, refreshToken, authz.userId, expiresAt, refreshExpiresAt);
+        ).run(crypto.randomUUID(), token, refreshToken, authz.userId, expiresAt, refreshExpiresAt);
 
         return res.json({ accessToken: token, refreshToken, expiresAt, tokenType: 'Bearer' });
       }
@@ -619,7 +618,7 @@ export function createCorralRoutes(
     if (!req.user) return res.error('Authentication required', 401);
 
     const { name, permissions } = req.body || {};
-    const id = randomUUID();
+    const id = crypto.randomUUID();
     const rawKey = 'sk_' + randomId(40);
     const prefix = rawKey.slice(0, 8); // e.g. sk_ABCDEF
     const permStr = Array.isArray(permissions) ? JSON.stringify(permissions) : '*';
@@ -706,7 +705,7 @@ export function createCorralRoutes(
     if (!db) return res.json({ tracked: true });
 
     const { start, end } = currentPeriod();
-    const id = randomUUID();
+    const id = crypto.randomUUID();
 
     db.prepare(
       `INSERT INTO "usage" (id, userId, meterId, count, periodStart, periodEnd)

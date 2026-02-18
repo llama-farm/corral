@@ -9,9 +9,12 @@
 
 import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
-import pg from "pg";
 
-const pool = new pg.Pool({
+// Dynamic import for ESM compatibility
+const pg = await import("pg");
+const Pool = pg.default?.Pool ?? pg.Pool;
+
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // Neon/Supabase/Railway all need SSL in production
   ssl: process.env.DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false },
@@ -19,7 +22,7 @@ const pool = new pg.Pool({
 });
 
 // Auto-bootstrap tables on first connection
-async function bootstrapDatabase(pool: pg.Pool) {
+async function bootstrapDatabase(pool: InstanceType<typeof Pool>) {
   const client = await pool.connect();
   try {
     await client.query(`
@@ -106,21 +109,25 @@ async function seedAdminIfNeeded() {
   let adminName = "Admin";
   let adminPlan = "{{DEFAULT_PAID_PLAN}}" || "free";
 
-  // Read from corral.yaml if env vars not set
-  const fs = await import("fs");
-  const pathMod = await import("path");
-  for (const p of ["corral.yaml", "../corral.yaml", "../frontend/corral.yaml"]) {
-    const resolved = pathMod.resolve(process.cwd(), p);
-    if (fs.existsSync(resolved)) {
-      const content = fs.readFileSync(resolved, "utf-8");
-      const em = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?email:\s*(\S+)/);
-      const pm = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?password:\s*(\S+)/);
-      const nm = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?name:\s*(.+)/);
-      if (em && !adminEmail) adminEmail = em[1];
-      if (pm && !adminPassword) adminPassword = pm[1];
-      if (nm) adminName = nm[1].trim();
-      break;
+  // Read from corral.yaml if env vars not set (Node.js only)
+  try {
+    const { readFileSync, existsSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    for (const p of ["corral.yaml", "../corral.yaml", "../frontend/corral.yaml"]) {
+      const resolved = resolve(process.cwd(), p);
+      if (existsSync(resolved)) {
+        const content = readFileSync(resolved, "utf-8");
+        const em = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?email:\s*(\S+)/);
+        const pm = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?password:\s*(\S+)/);
+        const nm = content.match(/seed:\s*\n\s+admin:\s*\n[\s\S]*?name:\s*(.+)/);
+        if (em && !adminEmail) adminEmail = em[1];
+        if (pm && !adminPassword) adminPassword = pm[1];
+        if (nm) adminName = nm[1].trim();
+        break;
+      }
     }
+  } catch {
+    // fs not available in serverless — use env vars only
   }
 
   if (!adminEmail || !adminPassword) return;

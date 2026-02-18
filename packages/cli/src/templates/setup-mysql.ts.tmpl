@@ -6,16 +6,19 @@
 
 import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
-import mysql from "mysql2/promise";
 
-const pool = mysql.createPool({
+// Dynamic import for ESM compatibility
+const mysql = await import("mysql2/promise");
+const mysqlMod = mysql.default ?? mysql;
+
+const pool = mysqlMod.createPool({
   uri: process.env.DATABASE_URL || "mysql://root:@localhost:3306/corral",
   waitForConnections: true,
   connectionLimit: 10,
 });
 
 // Auto-bootstrap tables on first connection
-async function bootstrapDatabase(pool: mysql.Pool) {
+async function bootstrapDatabase(pool: any) {
   const conn = await pool.getConnection();
   try {
     await conn.query(`

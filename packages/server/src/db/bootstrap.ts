@@ -1,12 +1,11 @@
 /**
  * Auto-bootstrap database for Better Auth.
- * 
- * PRINCIPLE: The database should just work on first run. Zero manual migration steps.
- * If the database doesn't exist, create it. If tables are missing, create them.
- * This runs on every server start and is fully idempotent (CREATE IF NOT EXISTS).
+ *
+ * Uses the DatabaseAdapter interface so the same bootstrap logic works across
+ * SQLite, PostgreSQL, MySQL, Turso, Neon, PlanetScale, D1, etc.
  */
 
-import type { CorralConfig } from "../config/schema.js";
+import type { DatabaseAdapter } from "./adapters.js";
 
 const BETTER_AUTH_TABLES_SQLITE = `
   CREATE TABLE IF NOT EXISTS "user" (
@@ -58,7 +57,6 @@ const BETTER_AUTH_TABLES_SQLITE = `
     updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  -- Indexes for performance
   CREATE INDEX IF NOT EXISTS idx_session_token ON "session"(token);
   CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"(userId);
   CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"(userId);
@@ -121,7 +119,6 @@ const BETTER_AUTH_TABLES_PG = `
   CREATE INDEX IF NOT EXISTS idx_user_email ON "user"(email);
 `;
 
-// Corral's own usage tables
 const USAGE_TABLES_SQLITE = `
   CREATE TABLE IF NOT EXISTS "usage_events" (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,15 +181,42 @@ const USAGE_TABLES_PG = `
   CREATE INDEX IF NOT EXISTS idx_usage_user_meter_period ON "usage"("userId", "meterId", "periodStart");
 `;
 
+/** Adapters that use SQLite-flavoured DDL */
+const SQLITE_ADAPTERS = new Set(["sqlite", "turso", "libsql", "d1"]);
+
 /**
  * Bootstrap the database: create all tables if they don't exist.
- * Call this on server startup. Fully idempotent.
+ * Accepts a DatabaseAdapter (preferred) or a raw driver + adapter name (legacy).
  */
-export function bootstrapDatabase(db: any, adapter: string = "sqlite"): void {
-  const isPg = adapter === "pg" || adapter === "postgres" || adapter === "postgresql";
-  
+export async function bootstrapDatabase(
+  adapterOrDb: DatabaseAdapter | any,
+  adapterName?: string,
+): Promise<void> {
+  // New path: DatabaseAdapter object
+  if (adapterOrDb && typeof adapterOrDb === "object" && "exec" in adapterOrDb && "name" in adapterOrDb) {
+    const adapter = adapterOrDb as DatabaseAdapter;
+    const isSqlite = SQLITE_ADAPTERS.has(adapter.name);
+    const authDDL = isSqlite ? BETTER_AUTH_TABLES_SQLITE : BETTER_AUTH_TABLES_PG;
+    const usageDDL = isSqlite ? USAGE_TABLES_SQLITE : USAGE_TABLES_PG;
+
+    try {
+      await adapter.exec(authDDL);
+    } catch (e: any) {
+      console.error("[Corral] Failed to bootstrap auth tables:", e.message);
+    }
+    try {
+      await adapter.exec(usageDDL);
+    } catch (e: any) {
+      console.error("[Corral] Failed to bootstrap usage tables:", e.message);
+    }
+    return;
+  }
+
+  // Legacy path: raw driver object (backwards compat)
+  const db = adapterOrDb;
+  const isPg = adapterName === "pg" || adapterName === "postgres" || adapterName === "postgresql";
+
   if (isPg) {
-    // For pg Pool, use query()
     if (typeof db.query === "function") {
       db.query(BETTER_AUTH_TABLES_PG).catch((e: any) => {
         console.error("[Corral] Failed to bootstrap PG auth tables:", e.message);
@@ -202,10 +226,9 @@ export function bootstrapDatabase(db: any, adapter: string = "sqlite"): void {
       });
     }
   } else {
-    // For better-sqlite3, use exec()
     if (typeof db.exec === "function") {
       try {
-        db.pragma("journal_mode = WAL");
+        db.pragma?.("journal_mode = WAL");
         db.exec(BETTER_AUTH_TABLES_SQLITE);
         db.exec(USAGE_TABLES_SQLITE);
       } catch (e: any) {
