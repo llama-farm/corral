@@ -1,6 +1,6 @@
 {
   "name": "@llamafarm/corral-ui",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "React UI components for Corral — auth flows, billing dashboards, and usage meters",
   "type": "module",
   "license": "MIT",

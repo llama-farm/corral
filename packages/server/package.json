@@ -1,6 +1,6 @@
 {
   "name": "@llamafarm/corral",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Authentication, billing, and API scaffolding for SaaS apps — batteries included",
   "type": "module",
   "license": "MIT",
