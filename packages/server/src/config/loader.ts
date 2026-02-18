@@ -1,8 +1,9 @@
 import { parse as parseYaml } from "yaml";
-import { createRequire } from "node:module";
 import { corralConfigSchema, type CorralConfig } from "./schema.js";
 
-const require = createRequire(import.meta.url);
+// Lazy-initialized readFileSync for Node.js file reading.
+// Avoids top-level import of node:module which crashes edge runtimes.
+let _readFileSync: ((path: string, encoding: string) => string) | null = null;
 
 function resolveEnvVars(obj: unknown): unknown {
   if (typeof obj === "string") {
@@ -38,8 +39,21 @@ export function loadConfig(pathOrConfig: string | Record<string, unknown>): Corr
     // File path — use synchronous fs for backwards compat (Node.js only).
     // In serverless environments, pass a config object or YAML string instead.
     try {
-      const fs = require("node:fs") as typeof import("node:fs");
-      const content = fs.readFileSync(pathOrConfig, "utf-8");
+      if (!_readFileSync) {
+        // Try CJS require first (works in bundled output & CJS), then createRequire (Node ESM)
+        const cjsRequire = Function("try{return require}catch{return null}")() as any;
+        if (cjsRequire) {
+          _readFileSync = cjsRequire("node:fs").readFileSync;
+        } else {
+          // This branch is reached in pure Node ESM — fall back to sync error.
+          // Users should use loadConfigAsync() or pass a config object.
+          throw Object.assign(
+            new Error("[Corral] Synchronous file loading unavailable in this ESM runtime. Use loadConfigAsync() or pass a config object."),
+            { code: "MODULE_NOT_FOUND" },
+          );
+        }
+      }
+      const content = _readFileSync(pathOrConfig, "utf-8");
       raw = parseYaml(content);
     } catch (e: any) {
       if (e.code === "MODULE_NOT_FOUND" || e.code === "ERR_MODULE_NOT_FOUND") {
