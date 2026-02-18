@@ -1,6 +1,6 @@
 {
   "name": "create-corral",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Agent-native auth + payments. Your AI coding agent adds login, Stripe billing, and feature gating to any app.",
   "type": "module",
   "license": "MIT",
@@ -42,6 +42,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "npx tsx test/e2e.ts",
     "lint": "echo 'no lint configured'",
     "clean": "rm -rf dist"
   },

@@ -17,13 +17,24 @@ import { validateCommand } from './commands/validate.js';
 import { rollbackCommandHandler } from './commands/rollback.js';
 import { addCommand } from './commands/add.js';
 import { deployCommand } from './commands/deploy.js';
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __cliDir = dirname(fileURLToPath(import.meta.url));
+const pkgVersion = (() => {
+  for (const p of [join(__cliDir, '..', 'package.json'), join(__cliDir, 'package.json')]) {
+    try { return JSON.parse(readFileSync(p, 'utf-8')).version; } catch {}
+  }
+  return '0.0.0';
+})();
 
 const program = new Command();
 
 program
   .name('corral')
   .description('🐄 Corral — Embedded auth + billing SDK')
-  .version('0.4.1')
+  .version(pkgVersion)
   .option('--json', 'Output as JSON')
   .option('--config <path>', 'Config file path', 'corral.yaml')
   .option('--verbose', 'Verbose output');
