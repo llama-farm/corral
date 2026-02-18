@@ -118,4 +118,5 @@ export async function createCorral(
 export { loadConfig, loadConfigAsync } from "./config/loader.js";
 export { corralConfigSchema } from "./config/schema.js";
 export { createAdapter, registerAdapter, d1Adapter } from "./db/adapters.js";
+export { bootstrapDatabase } from "./db/bootstrap.js";
 export type { AdapterFactory } from "./db/adapters.js";

@@ -205,6 +205,7 @@ const BETTER_AUTH_TABLES_MYSQL = `
     userAgent TEXT,
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_session_userId (userId),
     FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
   );
 
@@ -221,6 +222,7 @@ const BETTER_AUTH_TABLES_MYSQL = `
     password TEXT,
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_account_userId (userId),
     FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
   );
 
@@ -232,6 +234,7 @@ const BETTER_AUTH_TABLES_MYSQL = `
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   );
+
 `;
 
 const USAGE_TABLES_MYSQL = `
@@ -241,6 +244,8 @@ const USAGE_TABLES_MYSQL = `
     meterId VARCHAR(255) NOT NULL,
     value DOUBLE NOT NULL DEFAULT 1,
     createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_usage_events_user_meter (userId, meterId),
+    KEY idx_usage_events_created (createdAt),
     FOREIGN KEY (userId) REFERENCES \`user\`(id) ON DELETE CASCADE
   );
 
@@ -259,6 +264,7 @@ const USAGE_TABLES_MYSQL = `
     periodEnd VARCHAR(255) NOT NULL,
     UNIQUE KEY uq_usage_user_meter_period (userId, meterId, periodStart)
   );
+
 `;
 
 /** Adapters that use SQLite-flavoured DDL */

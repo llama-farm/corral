@@ -103,7 +103,16 @@ export async function mysqlAdapter(url: string): Promise<DatabaseAdapter> {
     name: "mysql",
     instance: pool,
     async exec(sql: string) {
-      await pool.query(sql);
+      // MySQL doesn't support multi-statement by default; split on semicolons.
+      // SAFETY: This naive splitting is fine because the DDL is generated
+      // internally by Corral (see bootstrap.ts), never from user input.
+      const statements = sql
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const stmt of statements) {
+        await pool.query(stmt);
+      }
     },
     async close() {
       await pool.end();

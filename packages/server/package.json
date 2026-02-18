@@ -8,7 +8,9 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./client": "./dist/client.js"
+    "./client": "./dist/client.js",
+    "./middleware/express": "./dist/middleware/express.js",
+    "./routes": "./dist/routes/corral-router.js"
   },
   "files": [
     "dist",
