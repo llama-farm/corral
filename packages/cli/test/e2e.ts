@@ -48,17 +48,31 @@ function writeJson(path: string, value: unknown) {
 }
 
 function parseInitJson(stdout: string): InitJson {
-  const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    if (!line.startsWith('{') || !line.endsWith('}')) continue;
-    try {
-      return JSON.parse(line) as InitJson;
-    } catch {
-      // keep searching
+  const end = stdout.lastIndexOf('}');
+  if (end === -1) throw new Error(`Could not find JSON output. Raw stdout:\n${stdout}`);
+
+  let depth = 0;
+  let start = -1;
+  for (let i = end; i >= 0; i--) {
+    const ch = stdout[i];
+    if (ch === '}') depth++;
+    if (ch === '{') {
+      depth--;
+      if (depth === 0) {
+        start = i;
+        break;
+      }
     }
   }
-  throw new Error(`Could not find JSON output. Raw stdout:\n${stdout}`);
+
+  if (start === -1) throw new Error(`Could not parse JSON bounds. Raw stdout:\n${stdout}`);
+
+  const jsonText = stdout.slice(start, end + 1);
+  try {
+    return JSON.parse(jsonText) as InitJson;
+  } catch {
+    throw new Error(`Failed to parse JSON payload. Raw stdout:\n${stdout}`);
+  }
 }
 
 function runInit(cwd: string, db: Db) {
