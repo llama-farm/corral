@@ -53,7 +53,7 @@ export function loadConfig(pathOrConfig: string | Record<string, unknown>): Corr
           );
         }
       }
-      const content = _readFileSync(pathOrConfig, "utf-8");
+      const content = _readFileSync!(pathOrConfig, "utf-8");
       raw = parseYaml(content);
     } catch (e: any) {
       if (e.code === "MODULE_NOT_FOUND" || e.code === "ERR_MODULE_NOT_FOUND") {
