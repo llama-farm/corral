@@ -10,7 +10,6 @@
 //   /webhook/stripe — Stripe webhook handler
 
 import type { Request, Response, NextFunction } from 'express';
-import { toNodeHandler } from 'better-auth/node';
 import { createCorralRoutes } from '../routes/corral-router.js';
 import { createWebhookHandler } from '../stripe/webhook.js';
 
@@ -39,33 +38,51 @@ interface CorralMiddlewareConfig {
 }
 
 export function corral(opts: CorralMiddlewareConfig) {
-  const authHandler = toNodeHandler(opts.auth);
-  const corralHandler = createCorralRoutes(opts.auth, opts.stripe || null, opts.config);
-  const webhookHandler = opts.stripe && opts.config.webhookSecret
-    ? createWebhookHandler(opts.stripe, opts.auth, {
-        plans: opts.config.plans || [],
-        webhookSecret: opts.config.webhookSecret || '',
-      })
-    : null;
+  // Lazy-init: the dynamic import runs once on the first request, then
+  // the resolved handler is reused for all subsequent requests.
+  let _handler: ((req: Request, res: Response, next: NextFunction) => void) | null = null;
+  let _initPromise: Promise<void> | null = null;
+
+  async function init() {
+    const { toNodeHandler } = await import('better-auth/node');
+    const authHandler = toNodeHandler(opts.auth);
+    const corralHandler = createCorralRoutes(opts.auth, opts.stripe || null, opts.config);
+    const webhookHandler = opts.stripe && opts.config.webhookSecret
+      ? createWebhookHandler(opts.stripe, opts.auth, {
+          plans: opts.config.plans || [],
+          webhookSecret: opts.config.webhookSecret || '',
+        })
+      : null;
+
+    _handler = function corralMiddleware(req: Request, res: Response, next: NextFunction) {
+      const path = req.path || req.url || '';
+
+      if (path.startsWith('/api/auth')) {
+        return authHandler(req, res);
+      }
+
+      if (path.startsWith('/api/corral')) {
+        return corralHandler(req, res);
+      }
+
+      if (path === '/webhook/stripe' && webhookHandler) {
+        return webhookHandler(req, res);
+      }
+
+      next();
+    };
+  }
 
   return function corralMiddleware(req: Request, res: Response, next: NextFunction) {
-    const path = req.path || req.url || '';
-
-    // Better Auth routes
-    if (path.startsWith('/api/auth')) {
-      return authHandler(req, res);
+    if (_handler) {
+      return _handler(req, res, next);
     }
-
-    // Corral API routes
-    if (path.startsWith('/api/corral')) {
-      return corralHandler(req, res);
+    // First request triggers the async init; subsequent requests wait on the same promise.
+    if (!_initPromise) {
+      _initPromise = init();
     }
-
-    // Stripe webhook (raw body required)
-    if (path === '/webhook/stripe' && webhookHandler) {
-      return webhookHandler(req, res);
-    }
-
-    next();
+    _initPromise
+      .then(() => _handler!(req, res, next))
+      .catch(next);
   };
 }

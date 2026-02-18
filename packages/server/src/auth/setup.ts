@@ -2,56 +2,36 @@ import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
 import type { CorralConfig } from "../config/schema.js";
 import { bootstrapDatabase } from "../db/bootstrap.js";
+import { createAdapter, type DatabaseAdapter } from "../db/adapters.js";
 
 /**
- * Create the correct database adapter for Better Auth.
- * 
- * LEARNING #1: Better Auth does NOT accept { url, type } objects for SQLite.
- * SQLite requires a `better-sqlite3` Database instance.
- * PostgreSQL requires a `pg` Pool instance.
- * MySQL requires a `mysql2/promise` pool instance.
+ * Create the database adapter using the pluggable adapter system.
+ *
+ * Replaces the old `require()`-based approach with dynamic `import()` so the
+ * package works in both ESM and CJS, and supports serverless drivers
+ * (Neon, D1, Turso, PlanetScale) alongside traditional Node.js drivers.
  */
-function createDatabaseAdapter(config: CorralConfig) {
-  const adapter = config.database.adapter || "sqlite";
+async function createDatabaseAdapter(config: CorralConfig): Promise<DatabaseAdapter> {
+  const adapterName = config.database.adapter || "sqlite";
   const url = config.database.url;
 
-  switch (adapter) {
-    case "sqlite": {
-      try {
-        const Database = require("better-sqlite3");
-        const dbPath = url.replace(/^file:/, "") || "./corral.db";
-        return new Database(dbPath);
-      } catch (e: any) {
-        throw new Error(
-          `[Corral] SQLite requires 'better-sqlite3' package. Run: npm install better-sqlite3\n` +
-          `Original error: ${e.message}`
-        );
-      }
-    }
-    case "pg": {
-      try {
-        const { Pool } = require("pg");
-        return new Pool({ connectionString: url });
-      } catch (e: any) {
-        throw new Error(
-          `[Corral] PostgreSQL requires 'pg' package. Run: npm install pg\n` +
-          `Original error: ${e.message}`
-        );
-      }
-    }
-    case "mysql": {
-      try {
-        const mysql = require("mysql2/promise");
-        return mysql.createPool(url);
-      } catch (e: any) {
-        throw new Error(
-          `[Corral] MySQL requires 'mysql2' package. Run: npm install mysql2\n` +
-          `Original error: ${e.message}`
-        );
-      }
-    }
-    default:
-      throw new Error(`[Corral] Unknown database adapter: ${adapter}. Use 'sqlite', 'pg', or 'mysql'.`);
+  try {
+    return await createAdapter(adapterName, url);
+  } catch (e: any) {
+    const hints: Record<string, string> = {
+      sqlite: "npm install better-sqlite3",
+      pg: "npm install pg",
+      neon: "npm install @neondatabase/serverless",
+      mysql: "npm install mysql2",
+      turso: "npm install @libsql/client",
+      libsql: "npm install @libsql/client",
+      planetscale: "npm install @planetscale/database",
+    };
+    const hint = hints[adapterName] ?? "";
+    throw new Error(
+      `[Corral] Failed to create "${adapterName}" adapter.${hint ? ` Try: ${hint}` : ""}\n` +
+        `Original error: ${e.message}`,
+    );
   }
 }
 
@@ -69,9 +49,9 @@ function resolveEnv(value: string | undefined, envKey: string): string | undefin
 
 /**
  * Build the email sending function.
- * Supports multiple transports: nodemailer (SMTP), resend, postmark, console (dev).
+ * Uses dynamic import() for optional dependencies (ESM-compatible).
  */
-function createEmailSender(config: CorralConfig) {
+async function createEmailSender(config: CorralConfig) {
   const emailConfig = config.auth.email;
   if (!emailConfig) return null;
 
@@ -79,7 +59,6 @@ function createEmailSender(config: CorralConfig) {
 
   switch (transport) {
     case "console":
-      // Dev mode: log emails to console
       return async ({ to, subject, body }: { to: string; subject: string; body: string }) => {
         console.log(`\n📧 [Corral Email - Console]\n  To: ${to}\n  Subject: ${subject}\n  Body: ${body}\n`);
       };
@@ -87,8 +66,9 @@ function createEmailSender(config: CorralConfig) {
     case "smtp":
     case "nodemailer": {
       try {
-        const nodemailer = require("nodemailer");
-        const transporter = nodemailer.createTransport({
+        const nodemailer = await import("nodemailer" as string);
+        const mod = nodemailer.default ?? nodemailer;
+        const transporter = mod.createTransport({
           host: resolveEnv(emailConfig.smtp?.host, "SMTP_HOST"),
           port: emailConfig.smtp?.port || 587,
           secure: emailConfig.smtp?.secure ?? false,
@@ -114,7 +94,7 @@ function createEmailSender(config: CorralConfig) {
 
     case "resend": {
       try {
-        const { Resend } = require("resend");
+        const { Resend } = await import("resend" as string);
         const resend = new Resend(resolveEnv(emailConfig.resend?.apiKey, "RESEND_API_KEY"));
         const from = emailConfig.from || resolveEnv(undefined, "EMAIL_FROM") || "noreply@example.com";
 
@@ -129,8 +109,9 @@ function createEmailSender(config: CorralConfig) {
 
     case "postmark": {
       try {
-        const postmark = require("postmark");
-        const client = new postmark.ServerClient(resolveEnv(emailConfig.postmark?.apiKey, "POSTMARK_API_KEY")!);
+        const postmark = await import("postmark" as string);
+        const mod = postmark.default ?? postmark;
+        const client = new mod.ServerClient(resolveEnv(emailConfig.postmark?.apiKey, "POSTMARK_API_KEY")!);
         const from = emailConfig.from || resolveEnv(undefined, "EMAIL_FROM") || "noreply@example.com";
 
         return async ({ to, subject, body }: { to: string; subject: string; body: string }) => {
@@ -150,24 +131,12 @@ function createEmailSender(config: CorralConfig) {
 
 /**
  * Build social provider configuration from corral.yaml + env vars.
- * 
- * Pattern: Each provider reads from config first, falls back to env vars.
- * This lets you put client IDs in corral.yaml and secrets in .env.local
- * 
- * Env var convention:
- *   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
- *   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
- *   APPLE_CLIENT_ID, APPLE_CLIENT_SECRET
- *   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET
- *   MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET
- *   TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET
- *   FACEBOOK_CLIENT_ID, FACEBOOK_CLIENT_SECRET
  */
 function buildSocialProviders(config: CorralConfig): Record<string, any> {
   const providers: Record<string, any> = {};
   const methods = config.auth.methods;
 
-  const providerMap: Record<string, { idEnv: string; secretEnv: string; extra?: Record<string, any> }> = {
+  const providerMap: Record<string, { idEnv: string; secretEnv: string }> = {
     google: { idEnv: "GOOGLE_CLIENT_ID", secretEnv: "GOOGLE_CLIENT_SECRET" },
     github: { idEnv: "GITHUB_CLIENT_ID", secretEnv: "GITHUB_CLIENT_SECRET" },
     apple: { idEnv: "APPLE_CLIENT_ID", secretEnv: "APPLE_CLIENT_SECRET" },
@@ -182,7 +151,6 @@ function buildSocialProviders(config: CorralConfig): Record<string, any> {
   for (const [name, envConfig] of Object.entries(providerMap)) {
     const configEntry = (methods as any)?.[name];
 
-    // Three ways to enable: explicit config object, `true` (env-only), or env vars present
     if (configEntry === true || typeof configEntry === "object") {
       const clientId = resolveEnv(configEntry?.client_id, envConfig.idEnv);
       const clientSecret = resolveEnv(configEntry?.client_secret, envConfig.secretEnv);
@@ -206,7 +174,7 @@ function buildSocialProviders(config: CorralConfig): Record<string, any> {
   return providers;
 }
 
-export function createAuth(config: CorralConfig) {
+export async function createAuth(config: CorralConfig) {
   // Pre-flight checks
   if (!process.env.BETTER_AUTH_SECRET && !config.auth.secret) {
     console.warn(
@@ -223,12 +191,16 @@ export function createAuth(config: CorralConfig) {
     );
   }
 
-  const database = createDatabaseAdapter(config);
-  const emailSender = createEmailSender(config);
+  const adapter = await createDatabaseAdapter(config);
+  const emailSender = await createEmailSender(config);
   const socialProviders = buildSocialProviders(config);
 
   // Auto-bootstrap: create tables if they don't exist. Zero manual steps.
-  bootstrapDatabase(database, config.database.adapter || "sqlite");
+  try {
+    await bootstrapDatabase(adapter);
+  } catch (e: any) {
+    console.warn(`[Corral] Database bootstrap warning: ${e.message}`);
+  }
 
   // ── Plugins ────────────────────────────────────────────────────────
 
@@ -237,7 +209,8 @@ export function createAuth(config: CorralConfig) {
   // Magic link (passwordless email login)
   if (config.auth.methods.magic_link && emailSender) {
     try {
-      const { magicLink } = require("better-auth/plugins");
+      const betterAuthPlugins = await import("better-auth/plugins");
+      const { magicLink } = betterAuthPlugins;
       plugins.push(
         magicLink({
           sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
@@ -265,10 +238,11 @@ export function createAuth(config: CorralConfig) {
     }
   }
 
-  // Email OTP (6-digit code login)
+  // Email OTP
   if (config.auth.methods.email_otp && emailSender) {
     try {
-      const { emailOTP } = require("better-auth/plugins");
+      const betterAuthPlugins = await import("better-auth/plugins");
+      const { emailOTP } = betterAuthPlugins;
       plugins.push(
         emailOTP({
           sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) => {
@@ -297,11 +271,12 @@ export function createAuth(config: CorralConfig) {
     }
   }
 
-  // Stripe billing (if configured)
+  // Stripe billing
   if (config.billing?.stripe) {
     try {
-      const { stripe: stripePlugin } = require("@better-auth/stripe");
-      const Stripe = require("stripe");
+      const stripePlugin = await import("@better-auth/stripe" as string);
+      const stripeMod = await import("stripe" as string);
+      const Stripe = stripeMod.default ?? stripeMod;
       const stripeKey = resolveEnv(config.billing.stripe.secret_key, "STRIPE_SECRET_KEY");
 
       if (stripeKey) {
@@ -315,8 +290,9 @@ export function createAuth(config: CorralConfig) {
             ...(p.group ? { group: p.group } : {}),
           }));
 
+        const stripePluginFn = stripePlugin.stripe ?? stripePlugin.default?.stripe;
         plugins.push(
-          stripePlugin({
+          stripePluginFn({
             stripeClient,
             stripeWebhookSecret: resolveEnv(config.billing.stripe.webhook_secret, "STRIPE_WEBHOOK_SECRET") || "",
             subscription: {
@@ -341,10 +317,9 @@ export function createAuth(config: CorralConfig) {
     baseURL: config.auth.server_url || process.env.BETTER_AUTH_URL,
     basePath: "/api/auth",
     secret: config.auth.secret || process.env.BETTER_AUTH_SECRET,
-    database,
+    database: adapter.instance,
     emailAndPassword: {
       enabled: config.auth.methods.email_password !== false,
-      // Password reset requires email sender
       ...(emailSender && config.auth.methods.email_password !== false
         ? {
             sendResetPassword: async ({ user, url }: { user: any; url: string }) => {
@@ -368,7 +343,6 @@ export function createAuth(config: CorralConfig) {
           }
         : {}),
     },
-    // Email verification
     ...(emailSender
       ? {
           emailVerification: {
@@ -398,11 +372,9 @@ export function createAuth(config: CorralConfig) {
       updateAge: config.auth.session.update_age,
     },
     plugins,
-    // Trusted origins for SPA/cross-origin
     ...(config.auth.trusted_origins ? { trustedOrigins: config.auth.trusted_origins } : {}),
   };
 
-  // Social providers (only add if any are configured)
   if (Object.keys(socialProviders).length > 0) {
     authOptions.socialProviders = socialProviders;
   }

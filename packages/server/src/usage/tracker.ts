@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+// Use Web Crypto API (available in Node 19+, Workers, Deno, etc.)
 import type { CorralConfig } from '../config/schema.js';
 
 /**
@@ -35,7 +35,7 @@ export function createUsageTracker(db: any, config: CorralConfig) {
   return {
     async increment(userId: string, meterId: string, amount: number = 1) {
       const { start, end } = currentPeriod();
-      const id = randomUUID();
+      const id = crypto.randomUUID();
 
       if (isPg) {
         await db.query(
